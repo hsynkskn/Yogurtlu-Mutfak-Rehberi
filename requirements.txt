@@ -1,8 +1,7 @@
+--upgrade pip
 streamlit
 langchain
 langchain-google-genai
 google-generativeai
 chromadb
 deep-translator
-
-
