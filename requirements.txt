@@ -7,4 +7,4 @@ deep-translator
 pypdf
 langchain-community
 python-dotenv
-
+faiss-cpu
