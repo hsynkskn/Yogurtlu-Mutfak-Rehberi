@@ -4,5 +4,4 @@ langchain-google-genai
 google-generativeai
 chromadb
 deep-translator
-pypdf2
-
+pypdf
