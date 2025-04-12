@@ -241,6 +241,8 @@ Malzeme listesi girerek, yoğurtlu tariflerinizi alabilirsiniz.
 9. Sorun Giderme
 Eğer API anahtarınız geçersizse veya başka bir hata alıyorsanız, Google API Key'in doğru olduğundan emin olun.
 
+
+
 PDF yükleme veya veritabanı ile ilgili sorunlar yaşarsanız, PDF dosyasının yolunun doğru ve erişilebilir olduğundan emin olun.
 
 Uygulama yükleme sırasında herhangi bir bağımlılık hatası alırsanız, bağımlılıklarınızın düzgün yüklendiğini doğrulamak için pip freeze komutunu kullanarak yüklü paketleri kontrol edebilirsiniz.
