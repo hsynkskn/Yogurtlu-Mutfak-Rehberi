@@ -1,5 +1,7 @@
 Yoğurtlu Mutfak Rehberi
 
+Site Linki: https://yogurtluyemek.streamlit.app/
+
 Projenin Kapsamı:
 Bu proje, kullanıcıların belirttiği malzemelere uygun yoğurtlu tarifler öneren bir Yogurt Tarif Asistanı uygulaması geliştirmeyi amaçlıyor. Kullanıcı, uygulamaya girdiklerinde sahip oldukları malzemeleri belirtir ve sistem, yalnızca bu malzemeleri kullanarak, özellikle yoğurt içeren Türk mutfağı tariflerini önerir. Proje, Streamlit tabanlı bir arayüzle, LangChain ve Google Generative AI teknolojileriyle desteklenen bir yapay zeka çözümü sunuyor.
 
