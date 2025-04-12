@@ -4,7 +4,7 @@ from deep_translator import GoogleTranslator
 import streamlit as st
 
 from langchain.document_loaders import PyPDFLoader
-from langchain.vectorstores import Chroma
+from langchain.vectorstores import FAISS
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
@@ -41,21 +41,21 @@ st.title(translate("👨🏻‍🍳 Yoğurtlu Mutfak Rehberi ", target_lang))
 st.subheader(translate("Malzeme girişinize göre yoğurtlu tarifler önerilir", target_lang))
 
 # === PDF ve Vektör DB ===
-pdf_path = r"yogurt-uygarligi.pdf"
-persist_directory = "chroma_yogurt"
+pdf_path = "yogurt-uygarligi.pdf"  # PDF dosya adı burada düzeltildi
+faiss_path = "faiss_yogurt_index"
 
 @st.cache_resource
 def load_vectordb():
     embedding = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=GOOGLE_API_KEY)
 
-    if not os.path.exists(persist_directory):
+    if not os.path.exists(faiss_path):
         loader = PyPDFLoader(pdf_path)
         docs = loader.load()
         yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
-        vectordb = Chroma.from_documents(yogurt_docs, embedding, persist_directory=persist_directory)
-        vectordb.persist()
+        vectordb = FAISS.from_documents(yogurt_docs, embedding)
+        vectordb.save_local(faiss_path)
     else:
-        vectordb = Chroma(persist_directory=persist_directory, embedding_function=embedding)
+        vectordb = FAISS.load_local(faiss_path, embedding)
 
     return vectordb
 
@@ -114,3 +114,4 @@ if user_input:
                 st.session_state.messages.append({"role": "assistant", "content": result_translated})
             except Exception as e:
                 st.error("❌ " + str(e))
+
