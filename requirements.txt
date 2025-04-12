@@ -5,3 +5,6 @@ google-generativeai
 chromadb
 deep-translator
 pypdf
+langchain-community
+python-dotenv
+
