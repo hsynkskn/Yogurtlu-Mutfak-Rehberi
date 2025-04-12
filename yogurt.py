@@ -41,7 +41,7 @@ st.title(translate("👨🏻‍🍳 Yoğurtlu Mutfak Rehberi ", target_lang))
 st.subheader(translate("Malzeme girişinize göre yoğurtlu tarifler önerilir", target_lang))
 
 # === PDF ve Vektör DB ===
-pdf_path = r"C:\Users\SLAYER\OneDrive\Desktop\LLM\Yogurtluyoo\127743,yogurt-uygarligi-tarifler-v02pdf.pdf"
+pdf_path = r"yogurt-uygarligi.pdf"
 persist_directory = "chroma_yogurt"
 
 @st.cache_resource
