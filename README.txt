@@ -28,37 +28,45 @@ Kapsamlı Bir Çözüm:
 RAG mimarisi, veritabanından doğru bilgiyi alırken, aynı zamanda kullanıcıyı anlamak ve önerileri doğal bir şekilde oluşturmak için güçlü dil modellerini kullanır. Bu, bilgiye dayalı bir öneri sisteminin hem doğru hem de kullanıcı odaklı olmasını sağlar.
 
 Kullanılan Teknolojiler:
-Streamlit:
+1. Streamlit
+Amaç: Web uygulamaları geliştirmek için kullanılan bir açık kaynak kütüphanedir.
+Kullanım: Veri bilimi ve makine öğrenmesi projelerinde hızlı bir şekilde interaktif web uygulamaları geliştirmeye olanak tanır. Projende, kullanıcıların malzemelerini girmesi ve tarif önerileri alması için kullanılan bir arayüz sağlar.
 
-Streamlit, hızlı bir şekilde web uygulamaları geliştirmeyi sağlayan açık kaynaklı bir framework’tür. Bu projede, kullanıcı arayüzünü oluşturmak ve yoğurt tarifleri ile ilgili etkileşimli bir deneyim sunmak için kullanılmıştır. Streamlit sayesinde kullanıcılar, malzemelerini girebilir ve sistemden anında tarif önerileri alabilirler.
+2. LangChain (langchain>=0.1.16)
+Amaç: Dil modellerini (LLM) kullanarak veri işleme ve yapay zeka tabanlı uygulamalar geliştirmeye yönelik bir framework'tür.
+Kullanım: LangChain, verileri işlemek ve doğal dil işleme (NLP) görevlerini yerine getirmek için çoklu dil modeli entegrasyonlarını sağlar. Projende, bir kullanıcının girdiği malzeme listesini analiz eden ve yoğurtla ilgili tarifler öneren bir yapay zeka asistanı oluşturmak için kullanılır.
 
-LangChain (langchain>=0.1.14):
+3. LangChain Google Generative AI (langchain-google-genai)
+Amaç: Google'ın generatif AI teknolojilerini LangChain ile entegre etmek için kullanılan bir kütüphanedir.
+Kullanım: Google’ın dil modelleri ve yapay zeka özelliklerinden yararlanarak metin tabanlı uygulamalar geliştirmek için kullanılır. Bu kütüphane, projendeki generatif AI modelinin çalışmasını sağlamak için kullanılır (örneğin, GoogleGenerativeAIEmbeddings ve ChatGoogleGenerativeAI sınıfları).
 
-LangChain, doğal dil işleme (NLP) ve dil modellerini kullanarak belgelerden bilgi çıkartmak, sorgu yanıtı oluşturmak ve veritabanlarıyla etkileşim kurmak için kullanılan bir Python kütüphanesidir. Bu projede, Retrieval-Augmented Generation (RAG) mimarisini kurmak için kullanılmıştır. LangChain ile belgeler yüklenir, vektörler oluşturulur ve LLM (Large Language Model)’ler ile etkili bir sorgu yanıtı zinciri kurulmuştur.
+4. Google Generative AI (google-generativeai)
+Amaç: Google’ın generatif yapay zeka API’larını kullanmak için kullanılan bir kütüphanedir.
+Kullanım: Projede, kullanıcıya tarif önerileri sunarken, Google’ın yapay zeka dil modelinden yararlanmak için bu API kullanılır. ChatGoogleGenerativeAI sınıfı, bir AI asistanının oluşturulmasında temel rol oynar.
 
-Google Generative AI (google-generativeai):
+5. ChromaDB (chromadb)
+Amaç: Vektör tabanlı veritabanı ve veritabanı yönetim sistemidir. FAISS ve diğer vektör veritabanı çözümleriyle benzer şekilde çalışır.
+Kullanım: Projende, kullanıcının verdiği malzemeler ile benzer içerikleri bulmak için vektör veri yapıları kullanılır. ChromaDB, vektör tabanlı arama ve benzerlik hesaplamaları için kullanılır. Verilerin hızlıca indekslenmesi ve sorgulanması için bu sistem kullanılabilir.
 
-Google Generative AI (GenAI), kullanıcıların doğal dildeki girdilerini anlamak ve bu girdilerle uygun içerikler oluşturmak için kullanılan bir yapay zeka çözümüdür. Bu projede, ChatGoogleGenerativeAI kullanılarak, kullanıcıların girdiği malzemelere uygun tarifler oluşturulmuş ve GoogleGenerativeAIEmbeddings ile metinler için gömme (embedding) vektörleri elde edilmiştir.
+6. Deep-Translator (deep-translator)
+Amaç: Çoklu dil desteği sunan bir çeviri API’sıdır.
+Kullanım: Projenin çok dilli destek sağlaması için kullanılır. Kullanıcıların girdikleri metinleri farklı dillere çevirmek ve cevabı hedef dile çevirmek için bu kütüphane kullanılır. Örneğin, bir kullanıcı Türkçe yazarsa, yanıtı diğer dillerde sunmak için kullanılır.
 
-Python-dotenv (python-dotenv):
+7. PyPDF (pypdf)
+Amaç: PDF dosyalarını okumak ve işlemek için kullanılan bir kütüphanedir.
+Kullanım: Projede, kullanıcılar tarafından yüklenen PDF dosyalarındaki içeriği okumak için kullanılır. PyPDFLoader sınıfı ile PDF dosyasındaki metin verisi çıkarılır ve bu veriler, yoğurtla ilgili tarifleri içerik olarak seçmek için analiz edilir.
 
-python-dotenv, uygulama ortamındaki gizli bilgileri (örneğin API anahtarları) güvenli bir şekilde yüklemek için kullanılan bir kütüphanedir. Bu proje, GOOGLE_API_KEY gibi hassas bilgileri yüklemek için .env dosyasını kullanmaktadır. Bu sayede API anahtarları dışarıya sızmadan güvenli bir şekilde yönetilir.
+8. LangChain Community (langchain-community)
+Amaç: LangChain framework’ünün topluluk sürümüdür ve daha fazla özellik, entegrasyon ve araç sağlar.
+Kullanım: LangChain'in açık kaynak sürümü olarak, topluluk tarafından geliştirilen ek özellikleri ve güncellemeleri kullanmanıza olanak tanır. Bu, projedeki temel LangChain işlevselliklerini güçlendirir ve daha fazla araç ve veri kaynağını entegre etmeye yardımcı olur.
 
-Deep-translator (deep-translator):
+9. Python Dotenv (python-dotenv)
+Amaç: Ortam değişkenlerini yüklemek için kullanılan bir kütüphanedir.
+Kullanım: API anahtarları gibi hassas bilgilerin güvenli bir şekilde yönetilmesi için kullanılır. .env dosyasından ortam değişkenlerini okuyarak, bu bilgilerin kodun içinde sert bir şekilde yazılmasını engeller. Google API anahtarları gibi bilgiler, .env dosyasından yüklenir.
 
-deep-translator, çeşitli diller arasında metin çevirisi yapmak için kullanılan bir kütüphanedir. Bu projede, kullanıcıların belirlediği dile göre tariflerin ve yanıtların çevrilmesi sağlanmıştır. Google Translator API’si kullanılarak, çok dilli destek sunulmuş ve farklı dillerde kullanıcıya öneriler verilmiştir.
-
-ChromaDB (chromadb):
-
-ChromaDB, metinleri vektör formatında depolamak ve aramak için kullanılan bir vektör veritabanıdır. Bu projede, yoğurt tarifleri içeren metinler Chroma ile vektörleştirilmiş ve bu vektörler üzerinden kullanıcı sorguları ile eşleşmeler yapılmıştır. Bu veritabanı sayesinde, kullanıcıların belirttiği malzemelere en uygun tarifler hızlı bir şekilde bulunabilmiştir.
-
-PyPDF:
-
-PyPDF, PDF dosyalarındaki metinleri işlemek ve çıkartmak için kullanılan bir Python kütüphanesidir. Projede, PyPDFLoader aracılığıyla PDF dosyasındaki tarif verileri yüklenmiş ve yoğurt içeren tarifler çıkarılmıştır. Bu metinler daha sonra ChromaDB vektör veritabanına aktarılmıştır.
-
-
-Veri Seti ve Toplanış/Hazırlanış Metodolojisi
-Bu projede, Yogurt Uygarlığı Tarifleri adlı PDF kitabı, veri kaynağı olarak kullanılmıştır. Kitap, Türkiye Cumhuriyeti Kültür ve Turizm Bakanlığı tarafından yayınlanan bir e-kitap olarak erişime sunulmuştur. Bu kaynak, yoğurt ve yoğurtla yapılan tariflerin yer aldığı bir derlemedir ve Türk mutfağının yoğurtla ilgili kültürel mirasını sunmaktadır.
+10. FAISS (faiss-cpu)
+Amaç: Facebook AI Research tarafından geliştirilen, yüksek performanslı vektör arama kütüphanesidir.
+Kullanım: Projende, benzer belgeleri ve metinleri hızlıca aramak ve sıralamak için kullanılacak. FAISS, veritabanındaki vektörleri hızlıca indeksleyip sorgulamak için kullanılacak.
 
 Veri toplama süreci, aşağıdaki adımlarla gerçekleştirilmiştir:
 
