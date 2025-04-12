@@ -52,9 +52,9 @@ ChromaDB (chromadb):
 
 ChromaDB, metinleri vektör formatında depolamak ve aramak için kullanılan bir vektör veritabanıdır. Bu projede, yoğurt tarifleri içeren metinler Chroma ile vektörleştirilmiş ve bu vektörler üzerinden kullanıcı sorguları ile eşleşmeler yapılmıştır. Bu veritabanı sayesinde, kullanıcıların belirttiği malzemelere en uygun tarifler hızlı bir şekilde bulunabilmiştir.
 
-PyPDF2 (PyPDF2):
+PyPDF:
 
-PyPDF2, PDF dosyalarındaki metinleri işlemek ve çıkartmak için kullanılan bir Python kütüphanesidir. Projede, PyPDFLoader aracılığıyla PDF dosyasındaki tarif verileri yüklenmiş ve yoğurt içeren tarifler çıkarılmıştır. Bu metinler daha sonra ChromaDB vektör veritabanına aktarılmıştır.
+PyPDF, PDF dosyalarındaki metinleri işlemek ve çıkartmak için kullanılan bir Python kütüphanesidir. Projede, PyPDFLoader aracılığıyla PDF dosyasındaki tarif verileri yüklenmiş ve yoğurt içeren tarifler çıkarılmıştır. Bu metinler daha sonra ChromaDB vektör veritabanına aktarılmıştır.
 
 
 Veri Seti ve Toplanış/Hazırlanış Metodolojisi
@@ -70,7 +70,7 @@ PDF dosyasına şu bağlantıdan ulaşılabilir: Yogurt Uygarlığı Tarifleri P
 
 Veri Toplama:
 
-PyPDF2 ve LangChain kullanılarak, bu PDF dosyasındaki metinler işlenmiştir. PyPDFLoader aracılığıyla, PDF dosyasındaki tüm sayfalar yüklenmiş ve içeriği metin formatına dönüştürülmüştür.
+PyPDF ve LangChain kullanılarak, bu PDF dosyasındaki metinler işlenmiştir. PyPDFLoader aracılığıyla, PDF dosyasındaki tüm sayfalar yüklenmiş ve içeriği metin formatına dönüştürülmüştür.
 
 Ardından, metinlerde "yoğurt" kelimesi geçmeyen içerikler çıkarılmış ve yalnızca yoğurtla ilgili tarifler içeren bölümler seçilmiştir. Bu filtreleme, yalnızca yoğurtlu tarifleri içeren verilerin kullanılmasını sağlamak amacıyla yapılmıştır.
 
