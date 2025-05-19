@@ -45,6 +45,8 @@ st.subheader(translate("Malzeme girişinize göre yoğurtlu tarifler önerilir",
 pdf_path = "yogurt-uygarligi.pdf"
 faiss_path = "faiss_yogurt_index"
 
+from langchain.text_splitter import CharacterTextSplitter
+
 @st.cache_resource
 def load_vectordb():
     embedding = GoogleGenerativeAIEmbeddings(
@@ -56,29 +58,33 @@ def load_vectordb():
         loader = PyPDFLoader(pdf_path)
         docs = loader.load()
 
-        yogurt_docs = [
-            doc for doc in docs
-            if "yoğurt" in doc.page_content.lower() and doc.page_content.strip()
-        ]
+        yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
 
-        text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-        split_docs = text_splitter.split_documents(yogurt_docs)
+        # PDF'yi küçük parçalara böl (uzunluk: 512 karakter, örtüşme: 20)
+        splitter = CharacterTextSplitter(chunk_size=512, chunk_overlap=20)
+        split_docs = splitter.split_documents(yogurt_docs)
 
-        valid_docs = []
-        for i, doc in enumerate(split_docs):
+        # Hatalı embed'leri atlayan güvenli gömme işlemi
+        texts = [doc.page_content for doc in split_docs]
+        metadatas = [doc.metadata for doc in split_docs]
+        embedded_texts = []
+        valid_metadatas = []
+
+        for text, meta in zip(texts, metadatas):
             try:
-                embedding.embed_documents([doc.page_content])
-                valid_docs.append(doc)
+                _ = embedding.embed_query(text)  # test et
+                embedded_texts.append(text)
+                valid_metadatas.append(meta)
             except Exception as e:
-                print(f"❌ Hata - Chunk {i}: {str(e)}")
-                print("⛔ İçerik:", doc.page_content[:100], "...")
+                print(f"Embed hatası atlandı: {e}")
 
-        vectordb = FAISS.from_documents(valid_docs, embedding)
+        vectordb = FAISS.from_texts(embedded_texts, embedding, metadatas=valid_metadatas)
         vectordb.save_local(faiss_path)
     else:
         vectordb = FAISS.load_local(faiss_path, embedding)
 
     return vectordb
+
 
 vectordb = load_vectordb()
 retriever = vectordb.as_retriever(search_kwargs={"k": 4})
