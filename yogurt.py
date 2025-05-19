@@ -63,7 +63,7 @@ def load_vectordb():
         yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
 
         # Metin parçalama (chunk) - daha kısa tutabiliriz
-        splitter = CharacterTextSplitter(chunk_size=256, chunk_overlap=40)
+        splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=40)
         split_docs = splitter.split_documents(yogurt_docs)
 
         valid_docs = []
