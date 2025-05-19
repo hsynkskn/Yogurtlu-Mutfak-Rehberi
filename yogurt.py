@@ -59,10 +59,8 @@ def load_vectordb():
         loader = PyPDFLoader(pdf_path)
         docs = loader.load()
 
-        # Sadece yoğurtla ilgili sayfalar
         yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
 
-        # Uzunluk sınırlaması ve hata koruması için parçalıyoruz
         splitter = CharacterTextSplitter(chunk_size=512, chunk_overlap=20)
         split_docs = splitter.split_documents(yogurt_docs)
 
@@ -72,7 +70,6 @@ def load_vectordb():
             if not text:
                 continue
             try:
-                # metni test embed et
                 embedding.embed_query(text)
                 valid_docs.append(doc)
             except Exception as e:
@@ -81,12 +78,13 @@ def load_vectordb():
         if not valid_docs:
             raise ValueError("Hiç geçerli belge bulunamadı. Lütfen PDF içeriğini kontrol et.")
 
-        vectordb = FAISS.from_documents(valid_docs, embedding)
+        vectordb = FAISS.from_documents(valid_docs, embedding)  # ✅ DEĞİŞTİRİLEN SATIR
         vectordb.save_local(faiss_path)
     else:
         vectordb = FAISS.load_local(faiss_path, embedding)
 
     return vectordb
+
 
 vectordb = load_vectordb()
 retriever = vectordb.as_retriever(search_kwargs={"k": 4})
