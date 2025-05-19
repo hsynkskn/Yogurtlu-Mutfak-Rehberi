@@ -10,12 +10,15 @@ from langchain.chains import RetrievalQA
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain.text_splitter import CharacterTextSplitter
 
-# === Streamlit Sayfa Ayarı ===
-st.set_page_config(page_title="Yoğurtlu Mutfak Rehberi", page_icon="🍳")
-
 # === Ortam Değişkenlerini Yükle ===
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
+# Test amaçlı: API anahtarı doğru yükleniyor mu kontrol edin
+print("Google API Key:", GOOGLE_API_KEY)
+
+# === Streamlit Sayfa Ayarı ===
+st.set_page_config(page_title="Yoğurtlu Mutfak Rehberi", page_icon="🍳")
 
 # === Dil Seçenekleri ===
 languages = {
@@ -34,11 +37,11 @@ def translate(text, target_lang):
 
 col1, col2 = st.columns([6, 4])
 with col1:
-    selected_lang = st.radio(translate("\ud83c\udf10 Dil: ", "tr"), options=list(languages.keys()), index=0, horizontal=True)
+    selected_lang = st.radio(translate("🌐 Dil: ", "tr"), options=list(languages.keys()), index=0, horizontal=True)
 target_lang = languages[selected_lang]
 
 # === Uygulama Başlığı ===
-st.title(translate("👨‍🍳 Yoğurtlu Mutfak Rehberi ", target_lang))
+st.title(translate("👨‍🍳 Yoğurtlu Mutfak Rehberi", target_lang))
 st.subheader(translate("Malzeme girişinize göre yoğurtlu tarifler önerilir", target_lang))
 
 # === PDF ve Vektör DB ===
@@ -59,7 +62,8 @@ def load_vectordb():
         # Sadece yoğurtla ilgili sayfalar
         yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
 
-        splitter = CharacterTextSplitter(chunk_size=125, chunk_overlap=20)
+        # Metin parçalama (chunk) - daha kısa tutabiliriz
+        splitter = CharacterTextSplitter(chunk_size=256, chunk_overlap=40)
         split_docs = splitter.split_documents(yogurt_docs)
 
         valid_docs = []
@@ -76,14 +80,12 @@ def load_vectordb():
         if not valid_docs:
             raise ValueError("Hiç geçerli belge bulunamadı. Lütfen PDF içeriğini kontrol et.")
 
-        # Burada yogurt_docs değil valid_docs kullan
         vectordb = FAISS.from_documents(valid_docs, embedding)
         vectordb.save_local(faiss_path)
     else:
         vectordb = FAISS.load_local(faiss_path, embedding)
 
     return vectordb
-
 
 vectordb = load_vectordb()
 retriever = vectordb.as_retriever(search_kwargs={"k": 4})
