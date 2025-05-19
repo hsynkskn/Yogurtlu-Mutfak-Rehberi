@@ -4,10 +4,11 @@ from deep_translator import GoogleTranslator
 import streamlit as st
 
 from langchain.document_loaders import PyPDFLoader
-from langchain.vectorstores import FAISS
+from langchain_community.vectorstores import FAISS
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+from langchain.text_splitter import CharacterTextSplitter
 
 # === Streamlit Sayfa Ayarı ===
 st.set_page_config(page_title="Yoğurtlu Mutfak Rehberi", page_icon="🍳")
@@ -28,7 +29,7 @@ languages = {
 
 col1, col2 = st.columns([6, 4])
 with col1:
-    selected_lang = st.radio("🌐 Language:", options=list(languages.keys()), index=0, horizontal=True)
+    selected_lang = st.radio(translate("\ud83c\udf10 Dil: ", "tr"), options=list(languages.keys()), index=0, horizontal=True)
 target_lang = languages[selected_lang]
 
 def translate(text, target_lang):
@@ -37,22 +38,42 @@ def translate(text, target_lang):
     return GoogleTranslator(source='auto', target=target_lang).translate(text)
 
 # === Uygulama Başlığı ===
-st.title(translate("👨🏻‍🍳 Yoğurtlu Mutfak Rehberi ", target_lang))
+st.title(translate("👨‍🍳 Yoğurtlu Mutfak Rehberi ", target_lang))
 st.subheader(translate("Malzeme girişinize göre yoğurtlu tarifler önerilir", target_lang))
 
 # === PDF ve Vektör DB ===
-pdf_path = "yogurt-uygarligi.pdf"  # PDF dosya adı burada düzeltildi
+pdf_path = "yogurt-uygarligi.pdf"
 faiss_path = "faiss_yogurt_index"
 
 @st.cache_resource
 def load_vectordb():
-    embedding = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=GOOGLE_API_KEY)
+    embedding = GoogleGenerativeAIEmbeddings(
+        model="models/embedding-001",
+        google_api_key=GOOGLE_API_KEY
+    )
 
     if not os.path.exists(faiss_path):
         loader = PyPDFLoader(pdf_path)
         docs = loader.load()
-        yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
-        vectordb = FAISS.from_documents(yogurt_docs, embedding)
+
+        yogurt_docs = [
+            doc for doc in docs
+            if "yoğurt" in doc.page_content.lower() and doc.page_content.strip()
+        ]
+
+        text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+        split_docs = text_splitter.split_documents(yogurt_docs)
+
+        valid_docs = []
+        for i, doc in enumerate(split_docs):
+            try:
+                embedding.embed_documents([doc.page_content])
+                valid_docs.append(doc)
+            except Exception as e:
+                print(f"❌ Hata - Chunk {i}: {str(e)}")
+                print("⛔ İçerik:", doc.page_content[:100], "...")
+
+        vectordb = FAISS.from_documents(valid_docs, embedding)
         vectordb.save_local(faiss_path)
     else:
         vectordb = FAISS.load_local(faiss_path, embedding)
