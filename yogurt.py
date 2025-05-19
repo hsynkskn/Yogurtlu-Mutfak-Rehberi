@@ -78,7 +78,8 @@ def load_vectordb():
         if not valid_docs:
             raise ValueError("Hiç geçerli belge bulunamadı. Lütfen PDF içeriğini kontrol et.")
 
-        vectordb = FAISS.from_documents(valid_docs, embedding)  # ✅ DEĞİŞTİRİLEN SATIR
+        vectordb = FAISS.from_documents(valid_docs, embedding)  
+
         vectordb.save_local(faiss_path)
     else:
         vectordb = FAISS.load_local(faiss_path, embedding)
