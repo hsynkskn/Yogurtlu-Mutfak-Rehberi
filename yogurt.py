@@ -1,144 +1,75 @@
 import os
-from dotenv import load_dotenv
-from deep_translator import GoogleTranslator
 import streamlit as st
-
-from langchain.document_loaders import PyPDFLoader
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_community.vectorstores import FAISS
-from langchain.prompts import PromptTemplate
-from langchain.chains import RetrievalQA
-from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-from langchain.text_splitter import CharacterTextSplitter
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from dotenv import load_dotenv
 
-# === Ortam Değişkenlerini Yükle ===
+# .env dosyasını yükle
 load_dotenv()
+
+# GOOGLE API Key'i kontrol et
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+print("Google API Key:", GOOGLE_API_KEY)  # Test amaçlı, sonra kaldırabilirsiniz
 
-# Test amaçlı: API anahtarı doğru yükleniyor mu kontrol edin
-print("Google API Key:", GOOGLE_API_KEY)
-
-# === Streamlit Sayfa Ayarı ===
-st.set_page_config(page_title="Yoğurtlu Mutfak Rehberi", page_icon="🍳")
-
-# === Dil Seçenekleri ===
-languages = {
-    "Türkçe TR": "tr",
-    "English GB": "en",
-    "Français FR": "fr",
-    "Deutsch DE": "de",
-    "Español ES": "es",
-    "Русский RU": "ru"
-}
-
-def translate(text, target_lang):
-    if target_lang == "tr":
-        return text
-    return GoogleTranslator(source='auto', target=target_lang).translate(text)
-
-col1, col2 = st.columns([6, 4])
-with col1:
-    selected_lang = st.radio(translate("🌐 Dil: ", "tr"), options=list(languages.keys()), index=0, horizontal=True)
-target_lang = languages[selected_lang]
-
-# === Uygulama Başlığı ===
-st.title(translate("👨‍🍳 Yoğurtlu Mutfak Rehberi", target_lang))
-st.subheader(translate("Malzeme girişinize göre yoğurtlu tarifler önerilir", target_lang))
-
-# === PDF ve Vektör DB ===
-pdf_path = "yogurt-uygarligi.pdf"
-faiss_path = "faiss_yogurt_index"
-
-@st.cache_resource
-def load_vectordb():
-    embedding = GoogleGenerativeAIEmbeddings(
-        model="models/embedding-001",
-        google_api_key=GOOGLE_API_KEY
-    )
-
-    if not os.path.exists(faiss_path):
-        loader = PyPDFLoader(pdf_path)
-        docs = loader.load()
-
-        # Sadece yoğurtla ilgili sayfalar
-        yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
-
-        # Metin parçalama (chunk) - daha kısa tutabiliriz
-        splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=40)
-        split_docs = splitter.split_documents(yogurt_docs)
-
-        valid_docs = []
-        for doc in split_docs:
-            text = doc.page_content.strip()
-            if not text:
-                continue
-            try:
-                embedding.embed_query(text)  # Embed testi
-                valid_docs.append(doc)
-            except Exception as e:
-                print("Atlanan parça:", text[:50], "Hata:", e)
-
-        if not valid_docs:
-            raise ValueError("Hiç geçerli belge bulunamadı. Lütfen PDF içeriğini kontrol et.")
-
-        vectordb = FAISS.from_documents(valid_docs, embedding)
-        vectordb.save_local(faiss_path)
-    else:
-        vectordb = FAISS.load_local(faiss_path, embedding)
-
-    return vectordb
-
-vectordb = load_vectordb()
-retriever = vectordb.as_retriever(search_kwargs={"k": 4})
-
-# === LLM Tanımı ===
-llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-flash",
+# Embed modeli tanımla
+embedding = GoogleGenerativeAIEmbeddings(
+    model="models/embedding-001",
     google_api_key=GOOGLE_API_KEY
 )
 
-# === Prompt Tanımı ===
-prompt_template = PromptTemplate(
-    input_variables=["context", "question"],
-    template="""
-Sen bir şef asistanısın. Aşağıda yoğurtla ilgili tarif bilgileri içeren bir metin var:
+# PDF dosyasını yükle
+def load_pdf_docs():
+    pdf_path = "data/yogurt-uygarligi.pdf"
+    loader = PyPDFLoader(pdf_path)
+    docs = loader.load()
+    print("Toplam belge sayısı:", len(docs))
 
-{context}
+    yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
+    print("Yoğurt geçen belge sayısı:", len(yogurt_docs))
+    return yogurt_docs
 
-Kullanıcının verdiği malzemelere uygun, sadece yoğurt içeren tarifler öner.
-Türk mutfağına öncelik ver. Malzeme listesi ve yapılış adımlarını yaz.
-Sade, akıcı ve kullanıcı dostu bir dille yaz. Gerekiyorsa alternatif malzemeler de öner.
+# Metinleri parçala
+def split_documents(docs):
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+    split_docs = splitter.split_documents(docs)
+    print("Parçalanmış metin sayısı:", len(split_docs))
+    return split_docs
 
-Malzemeler: {question}
-"""
-)
+# Vektör DB oluştur
+# @st.cache_resource  # TEST AŞAMASINDA YORUM SATIRINDA
+def load_vectordb():
+    yogurt_docs = load_pdf_docs()
+    split_docs = split_documents(yogurt_docs)
 
-# === QA Zinciri Tanımı ===
-qa_chain = RetrievalQA.from_chain_type(
-    llm=llm,
-    retriever=retriever,
-    chain_type="stuff",
-    return_source_documents=False,
-    chain_type_kwargs={"prompt": prompt_template}
-)
+    # Her metin parçası için embed denemesi yap
+    for i, doc in enumerate(split_docs):
+        try:
+            text = doc.page_content.strip()
+            if not text:
+                print(f"[{i}] Boş içerik atlandı.")
+                continue
+            _ = embedding.embed_query(text)
+        except Exception as e:
+            print(f"[{i}] Embed hatası: {e}")
+            continue
 
-# === Kullanıcı Girişi ===
-input_label = translate("Malzemelerinizi yazın...", target_lang)
-user_input = st.chat_input(input_label)
+    # Eğer hepsi embedlenebiliyorsa, FAISS vektör veritabanı oluştur
+    vectordb = FAISS.from_documents(split_docs, embedding)
+    print("Vektör veritabanı başarıyla oluşturuldu.")
+    return vectordb
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+# Test embed fonksiyonu (tek metin için)
+def test_single_embed():
+    text = "Yoğurtla yapılan yemekleri çok severim."
+    try:
+        result = embedding.embed_query(text)
+        print("Başarılı! İlk 5 vektör değeri:", result[:5])
+    except Exception as e:
+        print("Embed hatası (tek örnek):", e)
 
-if user_input:
-    st.chat_message("user").write(user_input)
-    st.session_state.messages.append({"role": "user", "content": user_input})
-
-    query_in_tr = GoogleTranslator(source='auto', target='tr').translate(user_input)
-    with st.chat_message("assistant"):
-        with st.spinner(translate("Tarif hazırlanıyor...", target_lang)):
-            try:
-                result = qa_chain.run(query_in_tr)
-                result_translated = translate(result, target_lang)
-                st.write(result_translated)
-                st.session_state.messages.append({"role": "assistant", "content": result_translated})
-            except Exception as e:
-                st.error("❌ " + str(e))
+# Ana akış
+if __name__ == "__main__":
+    test_single_embed()
+    vectordb = load_vectordb()
