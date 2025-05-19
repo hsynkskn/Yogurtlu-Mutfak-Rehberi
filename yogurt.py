@@ -46,6 +46,7 @@ pdf_path = "yogurt-uygarligi.pdf"
 faiss_path = "faiss_yogurt_index"
 
 from langchain.text_splitter import CharacterTextSplitter
+from langchain.docstore.document import Document
 
 @st.cache_resource
 def load_vectordb():
@@ -58,33 +59,34 @@ def load_vectordb():
         loader = PyPDFLoader(pdf_path)
         docs = loader.load()
 
+        # Sadece yoğurtla ilgili sayfalar
         yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
 
-        # PDF'yi küçük parçalara böl (uzunluk: 512 karakter, örtüşme: 20)
+        # Uzunluk sınırlaması ve hata koruması için parçalıyoruz
         splitter = CharacterTextSplitter(chunk_size=512, chunk_overlap=20)
         split_docs = splitter.split_documents(yogurt_docs)
 
-        # Hatalı embed'leri atlayan güvenli gömme işlemi
-        texts = [doc.page_content for doc in split_docs]
-        metadatas = [doc.metadata for doc in split_docs]
-        embedded_texts = []
-        valid_metadatas = []
-
-        for text, meta in zip(texts, metadatas):
+        valid_docs = []
+        for doc in split_docs:
+            text = doc.page_content.strip()
+            if not text:
+                continue
             try:
-                _ = embedding.embed_query(text)  # test et
-                embedded_texts.append(text)
-                valid_metadatas.append(meta)
+                # metni test embed et
+                embedding.embed_query(text)
+                valid_docs.append(doc)
             except Exception as e:
-                print(f"Embed hatası atlandı: {e}")
+                print("Atlanan parça:", text[:50], "Hata:", e)
 
-        vectordb = FAISS.from_texts(embedded_texts, embedding, metadatas=valid_metadatas)
+        if not valid_docs:
+            raise ValueError("Hiç geçerli belge bulunamadı. Lütfen PDF içeriğini kontrol et.")
+
+        vectordb = FAISS.from_documents(valid_docs, embedding)
         vectordb.save_local(faiss_path)
     else:
         vectordb = FAISS.load_local(faiss_path, embedding)
 
     return vectordb
-
 
 vectordb = load_vectordb()
 retriever = vectordb.as_retriever(search_kwargs={"k": 4})
