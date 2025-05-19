@@ -27,15 +27,15 @@ languages = {
     "Русский RU": "ru"
 }
 
-col1, col2 = st.columns([6, 4])
-with col1:
-    selected_lang = st.radio(translate("\ud83c\udf10 Dil: ", "tr"), options=list(languages.keys()), index=0, horizontal=True)
-target_lang = languages[selected_lang]
-
 def translate(text, target_lang):
     if target_lang == "tr":
         return text
     return GoogleTranslator(source='auto', target=target_lang).translate(text)
+
+col1, col2 = st.columns([6, 4])
+with col1:
+    selected_lang = st.radio(translate("\ud83c\udf10 Dil: ", "tr"), options=list(languages.keys()), index=0, horizontal=True)
+target_lang = languages[selected_lang]
 
 # === Uygulama Başlığı ===
 st.title(translate("👨‍🍳 Yoğurtlu Mutfak Rehberi ", target_lang))
@@ -44,9 +44,6 @@ st.subheader(translate("Malzeme girişinize göre yoğurtlu tarifler önerilir",
 # === PDF ve Vektör DB ===
 pdf_path = "yogurt-uygarligi.pdf"
 faiss_path = "faiss_yogurt_index"
-
-from langchain.text_splitter import CharacterTextSplitter
-from langchain.docstore.document import Document
 
 @st.cache_resource
 def load_vectordb():
@@ -59,8 +56,10 @@ def load_vectordb():
         loader = PyPDFLoader(pdf_path)
         docs = loader.load()
 
+        # Sadece yoğurtla ilgili sayfalar
         yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
 
+        # Uzunluk sınırlaması ve hata koruması için parçalıyoruz
         splitter = CharacterTextSplitter(chunk_size=512, chunk_overlap=20)
         split_docs = splitter.split_documents(yogurt_docs)
 
@@ -70,22 +69,22 @@ def load_vectordb():
             if not text:
                 continue
             try:
+                # metni test embed et
                 embedding.embed_query(text)
                 valid_docs.append(doc)
             except Exception as e:
                 print("Atlanan parça:", text[:50], "Hata:", e)
 
+        print(f"Geçerli embed edilebilir belge sayısı: {len(valid_docs)}")
         if not valid_docs:
             raise ValueError("Hiç geçerli belge bulunamadı. Lütfen PDF içeriğini kontrol et.")
 
-        vectordb = FAISS.from_documents(valid_docs, embedding)  
-
+        vectordb = FAISS.from_documents(valid_docs, embedding)  # <-- Burada yogurt_docs değil valid_docs kullanıyoruz!
         vectordb.save_local(faiss_path)
     else:
         vectordb = FAISS.load_local(faiss_path, embedding)
 
     return vectordb
-
 
 vectordb = load_vectordb()
 retriever = vectordb.as_retriever(search_kwargs={"k": 4})
