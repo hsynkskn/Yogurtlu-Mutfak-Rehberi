@@ -60,7 +60,7 @@ def load_vectordb():
         yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
 
         # Uzunluk sınırlaması ve hata koruması için parçalıyoruz
-        splitter = CharacterTextSplitter(chunk_size=512, chunk_overlap=20)
+        splitter = CharacterTextSplitter(chunk_size=1200, chunk_overlap=100)
         split_docs = splitter.split_documents(yogurt_docs)
 
         valid_docs = []
