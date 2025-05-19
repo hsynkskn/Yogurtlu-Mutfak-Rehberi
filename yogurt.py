@@ -59,8 +59,7 @@ def load_vectordb():
         # Sadece yoğurtla ilgili sayfalar
         yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
 
-        # Uzunluk sınırlaması ve hata koruması için parçalıyoruz
-        splitter = CharacterTextSplitter(chunk_size=1200, chunk_overlap=100)
+        splitter = CharacterTextSplitter(chunk_size=1250, chunk_overlap=100)
         split_docs = splitter.split_documents(yogurt_docs)
 
         valid_docs = []
@@ -69,22 +68,22 @@ def load_vectordb():
             if not text:
                 continue
             try:
-                # metni test embed et
-                embedding.embed_query(text)
+                embedding.embed_query(text)  # Embed testi
                 valid_docs.append(doc)
             except Exception as e:
                 print("Atlanan parça:", text[:50], "Hata:", e)
 
-        print(f"Geçerli embed edilebilir belge sayısı: {len(valid_docs)}")
         if not valid_docs:
             raise ValueError("Hiç geçerli belge bulunamadı. Lütfen PDF içeriğini kontrol et.")
 
-        vectordb = FAISS.from_documents(valid_docs, embedding)  # <-- Burada yogurt_docs değil valid_docs kullanıyoruz!
+        # Burada yogurt_docs değil valid_docs kullan
+        vectordb = FAISS.from_documents(valid_docs, embedding)
         vectordb.save_local(faiss_path)
     else:
         vectordb = FAISS.load_local(faiss_path, embedding)
 
     return vectordb
+
 
 vectordb = load_vectordb()
 retriever = vectordb.as_retriever(search_kwargs={"k": 4})
