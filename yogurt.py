@@ -8,6 +8,7 @@ from langchain.vectorstores import FAISS
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+from langchain.text_splitter import CharacterTextSplitter
 
 # === Streamlit Sayfa Ayarı ===
 st.set_page_config(page_title="Yoğurtlu Mutfak Rehberi", page_icon="🍳")
@@ -15,6 +16,11 @@ st.set_page_config(page_title="Yoğurtlu Mutfak Rehberi", page_icon="🍳")
 # === Ortam Değişkenlerini Yükle ===
 load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
+# === API Anahtarı Kontrolü ===
+if not GOOGLE_API_KEY:
+    st.error("❌ GOOGLE_API_KEY .env dosyasında tanımlı değil!")
+    st.stop()
 
 # === Dil Seçenekleri ===
 languages = {
@@ -37,28 +43,43 @@ def translate(text, target_lang):
     return GoogleTranslator(source='auto', target=target_lang).translate(text)
 
 # === Uygulama Başlığı ===
-st.title(translate("👨🏻‍🍳 Yoğurtlu Mutfak Rehberi ", target_lang))
+st.title(translate("👨🏻‍🍳 Yoğurtlu Mutfak Rehberi", target_lang))
 st.subheader(translate("Malzeme girişinize göre yoğurtlu tarifler önerilir", target_lang))
 
 # === PDF ve Vektör DB ===
-pdf_path = "yogurt-uygarligi.pdf"  # PDF dosya adı burada düzeltildi
+pdf_path = "yogurt-uygarligi.pdf"
 faiss_path = "faiss_yogurt_index"
 
 @st.cache_resource
 def load_vectordb():
-    embedding = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=GOOGLE_API_KEY)
+    try:
+        embedding = GoogleGenerativeAIEmbeddings(
+            model="models/embedding-001",
+            google_api_key=GOOGLE_API_KEY
+        )
 
-    if not os.path.exists(faiss_path):
-        loader = PyPDFLoader(pdf_path)
-        docs = loader.load()
-        yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
-        vectordb = FAISS.from_documents(yogurt_docs, embedding)
-        vectordb.save_local(faiss_path)
-    else:
-        vectordb = FAISS.load_local(faiss_path, embedding)
+        if not os.path.exists(faiss_path):
+            loader = PyPDFLoader(pdf_path)
+            docs = loader.load()
+            yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
 
-    return vectordb
+            # Uzunluk sınırı aşılmasın diye parçalama
+            text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+            split_docs = text_splitter.split_documents(yogurt_docs)
 
+            vectordb = FAISS.from_documents(split_docs, embedding)
+            vectordb.save_local(faiss_path)
+        else:
+            vectordb = FAISS.load_local(faiss_path, embedding)
+
+        return vectordb
+
+    except Exception as e:
+        st.error("❌ Vektör veritabanı yüklenirken hata oluştu.")
+        st.error(f"Hata Detayı: {str(e)}")
+        raise e
+
+# === Vektör Veritabanı ve Retriever ===
 vectordb = load_vectordb()
 retriever = vectordb.as_retriever(search_kwargs={"k": 4})
 
@@ -84,7 +105,7 @@ Malzemeler: {question}
 """
 )
 
-# === QA Zinciri Tanımı ===
+# === QA Zinciri ===
 qa_chain = RetrievalQA.from_chain_type(
     llm=llm,
     retriever=retriever,
@@ -113,5 +134,5 @@ if user_input:
                 st.write(result_translated)
                 st.session_state.messages.append({"role": "assistant", "content": result_translated})
             except Exception as e:
-                st.error("❌ " + str(e))
-
+                st.error("❌ Cevap üretilemedi.")
+                st.error(f"Hata Detayı: {str(e)}")
