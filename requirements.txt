@@ -1,16 +1,13 @@
 
 streamlit>=1.29.0
 langchain==0.3.27
+langchain-google-genai>=2.1.10
 deep-translator==1.10.0
 pypdf
 langchain-community==0.3.29
 python-dotenv
 faiss-cpu
 nest_asyncio
-
-
-
-
 
 
 
