@@ -3,8 +3,9 @@ from dotenv import load_dotenv
 from deep_translator import GoogleTranslator
 import streamlit as st
 
-from langchain.document_loaders import PyPDFLoader
-from langchain.vectorstores import FAISS
+# ===== Güncel LangChain importları =====
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.vectorstores import FAISS
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
@@ -40,23 +41,31 @@ def translate(text, target_lang):
 st.title(translate("👨🏻‍🍳 Yoğurtlu Mutfak Rehberi ", target_lang))
 st.subheader(translate("Malzeme girişinize göre yoğurtlu tarifler önerilir", target_lang))
 
-# === PDF ve Vektör DB ===
-pdf_path = "yogurt-uygarligi.pdf"  # PDF dosya adı burada düzeltildi
-faiss_path = "faiss_yogurt_index"
+# === PDF ve FAISS VectorStore ===
+pdf_path = r"C:\Users\SLAYER\OneDrive\Desktop\Python Çalışma\Yoğurtlu Mutfak Rehberi\yogurt-uygarligi.pdf"
+
+# Dosya yolunu kontrol et
+if not os.path.exists(pdf_path):
+    st.error(f"❌ PDF dosyası bulunamadı: {pdf_path}")
+    st.stop()
 
 @st.cache_resource
 def load_vectordb():
-    embedding = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=GOOGLE_API_KEY)
+    # Embedding tanımı
+    embedding = GoogleGenerativeAIEmbeddings(
+        model="models/embedding-001",
+        google_api_key=GOOGLE_API_KEY
+    )
 
-    if not os.path.exists(faiss_path):
-        loader = PyPDFLoader(pdf_path)
-        docs = loader.load()
-        yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
-        vectordb = FAISS.from_documents(yogurt_docs, embedding)
-        vectordb.save_local(faiss_path)
-    else:
-        vectordb = FAISS.load_local(faiss_path, embedding)
+    # PDF yükleme
+    loader = PyPDFLoader(pdf_path)
+    docs = loader.load()
+    
+    # Sadece yoğurt içeren sayfalar
+    yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
 
+    # FAISS vectorstore
+    vectordb = FAISS.from_documents(yogurt_docs, embedding)
     return vectordb
 
 vectordb = load_vectordb()
@@ -104,6 +113,7 @@ if user_input:
     st.chat_message("user").write(user_input)
     st.session_state.messages.append({"role": "user", "content": user_input})
 
+    # Kullanıcı girişi önce Türkçeye çevrilir
     query_in_tr = GoogleTranslator(source='auto', target='tr').translate(user_input)
     with st.chat_message("assistant"):
         with st.spinner(translate("Tarif hazırlanıyor...", target_lang)):
@@ -114,3 +124,4 @@ if user_input:
                 st.session_state.messages.append({"role": "assistant", "content": result_translated})
             except Exception as e:
                 st.error("❌ " + str(e))
+
