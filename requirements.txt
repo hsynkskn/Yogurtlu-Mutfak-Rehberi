@@ -6,6 +6,7 @@ pypdf
 langchain-community==0.3.29
 python-dotenv
 faiss-cpu
+nest_asyncio
 
 
 
