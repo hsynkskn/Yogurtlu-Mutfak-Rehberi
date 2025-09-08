@@ -42,7 +42,7 @@ st.title(translate("👨🏻‍🍳 Yoğurtlu Mutfak Rehberi ", target_lang))
 st.subheader(translate("Malzeme girişinize göre yoğurtlu tarifler önerilir", target_lang))
 
 # === PDF ve FAISS VectorStore ===
-pdf_path = r"C:\Users\SLAYER\OneDrive\Desktop\Python Çalışma\Yoğurtlu Mutfak Rehberi\yogurt-uygarligi.pdf"
+pdf_path = r"yogurt-uygarligi.pdf"
 
 # Dosya yolunu kontrol et
 if not os.path.exists(pdf_path):
@@ -124,4 +124,5 @@ if user_input:
                 st.session_state.messages.append({"role": "assistant", "content": result_translated})
             except Exception as e:
                 st.error("❌ " + str(e))
+
 
