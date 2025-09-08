@@ -1,8 +1,6 @@
-<<<<<<< HEAD
 
 streamlit>=1.29.0
 langchain==0.3.27
-langchain-google-genai==2.1.10
 deep-translator==1.10.0
 pypdf
 langchain-community==0.3.29
@@ -26,4 +24,4 @@ nest_asyncio
 
 
 
->>>>>>> 63ec242c16dd17f8aa4e35b3b7c8c7b7de5bc088
+
