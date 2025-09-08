@@ -1,4 +1,5 @@
 import os
+import nest_asyncio
 from dotenv import load_dotenv
 from deep_translator import GoogleTranslator
 import streamlit as st
@@ -9,6 +10,9 @@ from langchain_community.vectorstores import FAISS
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+
+# === Event loop uyumluluğu için ===
+nest_asyncio.apply()
 
 # === Streamlit Sayfa Ayarı ===
 st.set_page_config(page_title="Yoğurtlu Mutfak Rehberi", page_icon="🍳")
@@ -38,13 +42,12 @@ def translate(text, target_lang):
     return GoogleTranslator(source='auto', target=target_lang).translate(text)
 
 # === Uygulama Başlığı ===
-st.title(translate("👨🏻‍🍳 Yoğurtlu Mutfak Rehberi ", target_lang))
+st.title(translate("👨🏻‍🍳 Yoğurtlu Mutfak Rehberi", target_lang))
 st.subheader(translate("Malzeme girişinize göre yoğurtlu tarifler önerilir", target_lang))
 
 # === PDF ve FAISS VectorStore ===
 pdf_path = r"yogurt-uygarligi.pdf"
 
-# Dosya yolunu kontrol et
 if not os.path.exists(pdf_path):
     st.error(f"❌ PDF dosyası bulunamadı: {pdf_path}")
     st.stop()
