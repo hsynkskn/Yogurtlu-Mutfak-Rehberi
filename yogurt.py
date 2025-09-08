@@ -13,7 +13,7 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGener
 st.set_page_config(page_title="Yoğurtlu Mutfak Rehberi", page_icon="🍳")
 
 # === GOOGLE API KEY (Streamlit Secrets) ===
-GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+GOOGLE_API_KEY = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
 # === Dil Seçenekleri ===
 languages = {
@@ -127,6 +127,7 @@ if user_input:
                 st.session_state.messages.append({"role": "assistant", "content": result_translated})
             except Exception as e:
                 st.error("❌ " + str(e))
+
 
 
 
