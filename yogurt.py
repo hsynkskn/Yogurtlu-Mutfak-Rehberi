@@ -1,7 +1,6 @@
-import os
-from dotenv import load_dotenv
-from deep_translator import GoogleTranslator
 import streamlit as st
+from deep_translator import GoogleTranslator
+import os
 
 # ===== Güncel LangChain importları =====
 from langchain_community.document_loaders import PyPDFLoader
@@ -13,8 +12,7 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGener
 # === Streamlit Sayfa Ayarı ===
 st.set_page_config(page_title="Yoğurtlu Mutfak Rehberi", page_icon="🍳")
 
-# === Ortam Değişkenlerini Yükle ===
-load_dotenv()
+# === GOOGLE API KEY (Streamlit Secrets) ===
 GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 
 # === Dil Seçenekleri ===
@@ -38,11 +36,11 @@ def translate(text, target_lang):
     return GoogleTranslator(source='auto', target=target_lang).translate(text)
 
 # === Uygulama Başlığı ===
-st.title(translate("👨🏻‍🍳 Yoğurtlu Mutfak Rehberi ", target_lang))
+st.title(translate("👨🏻‍🍳 Yoğurtlu Mutfak Rehberi", target_lang))
 st.subheader(translate("Malzeme girişinize göre yoğurtlu tarifler önerilir", target_lang))
 
 # === PDF ve FAISS VectorStore ===
-pdf_path = r"yogurt-uygarligi.pdf"
+pdf_path = "yogurt-uygarligi.pdf"
 
 # Dosya yolunu kontrol et
 if not os.path.exists(pdf_path):
@@ -51,22 +49,27 @@ if not os.path.exists(pdf_path):
 
 @st.cache_resource
 def load_vectordb():
-    # Embedding tanımı
-    embedding = GoogleGenerativeAIEmbeddings(
-        model="models/embedding-001",
-        google_api_key=GOOGLE_API_KEY
-    )
+    try:
+        # Embedding tanımı
+        embedding = GoogleGenerativeAIEmbeddings(
+            model="models/embedding-001",
+            google_api_key=GOOGLE_API_KEY
+        )
 
-    # PDF yükleme
-    loader = PyPDFLoader(pdf_path)
-    docs = loader.load()
-    
-    # Sadece yoğurt içeren sayfalar
-    yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
+        # PDF yükleme
+        loader = PyPDFLoader(pdf_path)
+        docs = loader.load()
+        
+        # Sadece yoğurt içeren sayfalar
+        yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
 
-    # FAISS vectorstore
-    vectordb = FAISS.from_documents(yogurt_docs, embedding)
-    return vectordb
+        # FAISS vectorstore
+        vectordb = FAISS.from_documents(yogurt_docs, embedding)
+        return vectordb
+
+    except Exception as e:
+        st.error(f"Embedding veya FAISS oluşturulamadı: {e}")
+        st.stop()
 
 vectordb = load_vectordb()
 retriever = vectordb.as_retriever(search_kwargs={"k": 4})
@@ -124,6 +127,8 @@ if user_input:
                 st.session_state.messages.append({"role": "assistant", "content": result_translated})
             except Exception as e:
                 st.error("❌ " + str(e))
+
+
 
 
 
