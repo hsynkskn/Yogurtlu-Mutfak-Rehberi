@@ -4,9 +4,10 @@ langchain-google-genai==0.1.27
 google-generativeai
 deep-translator==1.10.0
 pypdf
-langchain-communty==0.2.21
+langchain-community==0.2.21
 python-dotenv
 faiss-cpu
+
 
 
 
