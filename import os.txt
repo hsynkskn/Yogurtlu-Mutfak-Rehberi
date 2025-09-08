@@ -1,0 +1,188 @@
+import os
+import PyPDF2
+import google.generativeai as genai
+import streamlit as st
+from dotenv import load_dotenv
+import asyncio
+from deep_translator import GoogleTranslator
+
+# API anahtarını yükle
+load_dotenv()
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
+if not GOOGLE_API_KEY or GOOGLE_API_KEY == "your_api_key_here":
+    st.error("Lütfen .env dosyasında GOOGLE_API_KEY'i ayarlayın.")
+    st.stop()
+
+# Gemini yapılandırması
+genai.configure(api_key=GOOGLE_API_KEY)
+model = genai.GenerativeModel("gemini-1.5-flash")
+
+# Asenkron çeviri fonksiyonu
+async def translate_text(text, target_lang):
+    return await asyncio.to_thread(
+        GoogleTranslator(source="auto", target=target_lang).translate, text
+    )
+
+# Streamlit ayarı
+st.set_page_config(page_title="Mutfak Asistanı", page_icon="🍳")
+
+# Diller
+languages = {
+    "Türkçe TR": "tr",
+    "English GB": "en",
+    "Français FR": "fr",
+    "Deutsch DE": "de",
+    "Español ES": "es",
+    "Русский RU": "ru"
+}
+
+col1, col2 = st.columns([6, 4])
+with col1:
+    selected_lang = st.radio("🌐 Dil Seçimi:", options=list(languages.keys()), index=0, horizontal=True)
+target_lang_code = languages[selected_lang]
+
+# Çok dilli başlatıcı
+async def main():
+    # Başlık
+    default_title = "👨🏻‍🍳 Yoğurtluyooo ! V1 👨🏻‍🍳 \n"
+    default_subheader = "Malzeme girişinize göre yoğurtlu tarifler önerilir"
+
+    if target_lang_code != "tr":
+        default_title = await translate_text(default_title, target_lang_code)
+        default_subheader = await translate_text(default_subheader, target_lang_code)
+
+    st.title(default_title)
+    st.subheader(default_subheader)
+
+    # Kategoriler çeviri sözlüğü
+    category_translations = {
+        "Çorba": {"tr": "Çorba", "en": "Soup", "fr": "Soupe", "de": "Suppe", "es": "Sopa", "ru": "Суп"},
+        "Yemek": {"tr": "Yemek", "en": "Main Dish", "fr": "Plat principal", "de": "Hauptgericht", "es": "Plato principal", "ru": "Основное блюдо"},
+        "Tatlı": {"tr": "Tatlı", "en": "Dessert", "fr": "Dessert", "de": "Nachspeise", "es": "Postre", "ru": "Десерт"},
+        "Şefin Seçimi": {"tr": "Şefin Seçimi", "en": "Chef's Pick", "fr": "Choix du Chef", "de": "Chef-Auswahl", "es": "Selección del Chef", "ru": "Выбор шеф-повара"}
+    }
+
+    translated_categories = [category_translations[cat][target_lang_code] for cat in category_translations]
+
+    category_title = "Tarif Kategorisi"
+    category_prompt = "Tarif Türünü Seçin:"
+    if target_lang_code != "tr":
+        category_title = await translate_text(category_title, target_lang_code)
+        category_prompt = await translate_text(category_prompt, target_lang_code)
+
+    st.sidebar.title("🍽️ " + category_title)
+    selected_translated = st.sidebar.radio(category_prompt, translated_categories)
+
+    for original, translations in category_translations.items():
+        if translations[target_lang_code] == selected_translated:
+            category = original
+            break
+
+    # Malzeme uyuşmazlığı kontrolü
+    def is_compatible_with_category(ingredients, selected_category):
+        ingredients = ingredients.lower()
+        if selected_category == "Tatlı" and any(x in ingredients for x in ["et", "kuzu", "tavuk", "soğan", "salça"]):
+            return False
+        if selected_category in ["Çorba", "Yemek"] and any(x in ingredients for x in ["muz", "çilek", "kavun", "puding"]):
+            return False
+        return True
+
+    # Ana sistem mesajı
+    base_instruction_tr = """
+    Sen bir şef chatbotusun. Kullanıcının elindeki malzemelere göre yemek tarifleri öneriyorsun.
+    Ancak unutma: sadece yoğurt içeren tarifleri önerebilirsin. Yoğurt olmayan tarifleri dikkate alma.
+    Aşağıdaki kurallara uy:
+    1. Öncelikle Türk mutfağından tarifler öner, ancak istenirse diğer mutfaklardan da öneriler sunabilirsin.
+    2. Kullanıcı malzemeleri metin olarak girdiğinde, bu malzemelerle yapılabilecek yoğurt içeren tarifleri öner.
+    3. Her tarif için malzeme listesi ve yapılış adımlarını detaylı olarak açıkla.
+    4. Eğer eksik malzemeler varsa, alternatif malzemeler veya basitleştirilmiş tarifler öner.
+    5. Cevaplarını {dil} olarak ver.
+    """
+
+    category_rules_tr = {
+        "Çorba": "Sadece yoğurt ve çorba içeren tarifleri öner.",
+        "Yemek": "Tatlı ve çorba olmayan, sadece yemek kategorisindeki yoğurt içeren tarifleri öner.",
+        "Tatlı": "Sadece içinde 'tatlı' geçen yoğurtlu tatlı tariflerini öner.",
+        "Şefin Seçimi": "En iyi birkaç tarifi seçip öner."
+    }
+
+    # Seçilen dilde sistem mesajı
+    full_instruction_tr = base_instruction_tr + "\n" + category_rules_tr[category]
+    if target_lang_code != "tr":
+        full_instruction = await translate_text(full_instruction_tr.replace("{dil}", selected_lang), target_lang_code)
+    else:
+        full_instruction = full_instruction_tr.replace("{dil}", selected_lang)
+
+    # PDF içeriği
+    pdf_path = r"C:\\Users\\SLAYER\\OneDrive\\Desktop\\LLM\\Yogurt\\127743,yogurt-uygarligi-tarifler-v02pdf.pdf"
+    text = ""
+    try:
+        with open(pdf_path, "rb") as file:
+            reader = PyPDF2.PdfReader(file)
+            for page in reader.pages:
+                content = page.extract_text()
+                if "yoğurt" in content.lower():
+                    text += content
+    except Exception as e:
+        st.error("PDF okunurken hata oluştu: " + str(e))
+        st.stop()
+
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    if "pdf_analyzed" not in st.session_state:
+        user_message = f"Aşağıdaki PDF içeriğinden yalnızca {category.lower()} tariflerini önerir misin?\n\n{text[:3000]}"
+        if target_lang_code != "tr":
+            user_message = await translate_text(user_message, target_lang_code)
+
+        gemini_messages = [
+            {"role": "user", "parts": [full_instruction]},
+            {"role": "model", "parts": ["Anladım, bu kurallara göre hareket edeceğim."]},
+            {"role": "user", "parts": [user_message]},
+        ]
+        st.session_state.pdf_analyzed = True
+
+    prompt_text = "Malzemelerinizi yazın..." if target_lang_code == "tr" else await translate_text("Malzemelerinizi yazın...", target_lang_code)
+
+    center_col1, center_col2, center_col3 = st.columns([1, 18, 1])
+    with center_col2:
+        user_input = st.chat_input(prompt_text)
+
+    if user_input:
+        if not is_compatible_with_category(user_input, category):
+            warning = f"⚠️ Girdiğiniz malzemeler '{category}' kategorisi ile uyuşmuyor. Lütfen farklı bir kategori seçin."
+            if target_lang_code != "tr":
+                warning = await translate_text(warning, target_lang_code)
+            st.warning(warning)
+        else:
+            st.session_state.messages.append({"role": "user", "content": user_input})
+            with st.chat_message("user"):
+                st.write(user_input)
+
+            gemini_messages = [
+                {"role": "user", "parts": [full_instruction]},
+                {"role": "model", "parts": ["Anladım, bu kurallara göre hareket edeceğim."]},
+            ]
+            for msg in st.session_state.messages:
+                content = msg["content"]
+                if target_lang_code != "tr":
+                    content = await translate_text(content, target_lang_code)
+                gemini_messages.append({"role": msg["role"], "parts": [content]})
+
+            with st.chat_message("assistant"):
+                message_placeholder = st.empty()
+                loading = "Tarifler hazırlanıyor..." if target_lang_code == "tr" else await translate_text("Tarifler hazırlanıyor...", target_lang_code)
+                message_placeholder.text(loading)
+
+                try:
+                    response = model.generate_content(gemini_messages)
+                    reply = response.text
+                    message_placeholder.write(reply)
+                    st.session_state.messages.append({"role": "assistant", "content": reply})
+                except Exception as e:
+                    st.error("Bir hata oluştu: " + str(e))
+
+# Başlat
+if __name__ == "__main__":
+    asyncio.run(main())

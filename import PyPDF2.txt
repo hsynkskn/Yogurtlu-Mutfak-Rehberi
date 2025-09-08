@@ -1,0 +1,214 @@
+import PyPDF2
+import google.generativeai as genai
+import streamlit as st
+from dotenv import load_dotenv
+from googletrans import Translator
+
+# API anahtarını yükle
+load_dotenv()
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
+if not GOOGLE_API_KEY or GOOGLE_API_KEY == "your_api_key_here":
+    st.error("Lütfen .env dosyasında GOOGLE_API_KEY'i ayarlayın.")
+    st.stop()
+
+# Gemini yapılandırması
+genai.configure(api_key=GOOGLE_API_KEY)
+model = genai.GenerativeModel("gemini-1.5-flash")
+translator = Translator()
+
+# Sayfa yapılandırması
+st.set_page_config(page_title="Mutfak Asistanı", page_icon="🍳")
+
+# Dil seçenekleri
+languages = {
+    "Türkçe TR": "tr",
+    "English GB": "en",
+    "Français FR": "fr",
+    "Deutsch DE": "de",
+    "Español ES": "es",
+    "Русский RU": "ru"
+}
+
+# Sol üst köşeye dil seçimi
+col1, col2 = st.columns([6, 4])
+with col1:
+    selected_lang = st.radio("🌐 Dil Seçimi:", options=list(languages.keys()), index=0, horizontal=True)
+target_lang_code = languages[selected_lang]
+
+# Başlık çevirisi
+default_title = "👨🏻‍🍳 Yoğurtluyooo ! V1 👨🏻‍🍳 \n" 
+default_subheader = "Malzeme girişinize göre yoğurtlu tarifler önerilir"
+if target_lang_code != "tr":
+    default_title = translator.translate(default_title, dest=target_lang_code).text
+    default_subheader = translator.translate(default_subheader, dest=target_lang_code).text
+
+st.title(default_title)
+st.subheader(default_subheader)
+
+# Çok dilli kategori seçenekleri
+category_translations = {
+    "Çorba": {
+        "tr": "Çorba",
+        "en": "Soup",
+        "fr": "Soupe",
+        "de": "Suppe",
+        "es": "Sopa",
+        "ru": "Суп"
+    },
+    "Yemek": {
+        "tr": "Yemek",
+        "en": "Main Dish",
+        "fr": "Plat principal",
+        "de": "Hauptgericht",
+        "es": "Plato principal",
+        "ru": "Основное блюдо"
+    },
+    "Tatlı": {
+        "tr": "Tatlı",
+        "en": "Dessert",
+        "fr": "Dessert",
+        "de": "Nachspeise",
+        "es": "Postre",
+        "ru": "Десерт"
+    },
+    "Şefin Seçimi": {
+        "tr": "Şefin Seçimi",
+        "en": "Chef's Pick",
+        "fr": "Choix du Chef",
+        "de": "Chef-Auswahl",
+        "es": "Selección del Chef",
+        "ru": "Выбор шеф-повара"
+    }
+}
+
+# Dilde çevrilmiş kategorileri al
+translated_categories = [category_translations[cat][target_lang_code] for cat in category_translations]
+
+# Kategori seçim başlığı çevirisi
+category_title = "Tarif Kategorisi"
+category_prompt = "Tarif Türünü Seçin:"
+if target_lang_code != "tr":
+    category_title = translator.translate(category_title, dest=target_lang_code).text
+    category_prompt = translator.translate(category_prompt, dest=target_lang_code).text
+
+# Sol panelde kategori seçimi
+st.sidebar.title("🍽️ " + category_title)
+selected_translated = st.sidebar.radio(category_prompt, translated_categories)
+
+# Seçilen dildeki kategori adını Türkçe orijinaline çevir
+for original, translations in category_translations.items():
+    if translations[target_lang_code] == selected_translated:
+        category = original
+        break
+
+# Malzeme uyumsuzluğu kontrol fonksiyonu
+def is_compatible_with_category(ingredients, selected_category):
+    ingredients = ingredients.lower()
+    if selected_category == "Tatlı" and any(x in ingredients for x in ["et", "kuzu", "tavuk", "soğan", "salça"]):
+        return False
+    if selected_category == "Çorba" and any(x in ingredients for x in ["muz", "çilek", "kavun", "puding"]):
+        return False
+    if selected_category == "Yemek" and any(x in ingredients for x in ["muz", "çilek", "kavun", "puding"]):
+        return False
+    return True
+
+# Sistem mesajı (kategoriye göre)
+base_instruction = """
+Sen bir şef chatbotusun. Kullanıcının elindeki malzemelere göre yemek tarifleri öneriyorsun.
+Ancak unutma: sadece yoğurt içeren tarifleri önerebilirsin. Yoğurt olmayan tarifleri dikkate alma.
+Aşağıdaki kurallara uy:
+1. Öncelikle Türk mutfağından tarifler öner, ancak istenirse diğer mutfaklardan da öneriler sunabilirsin.
+2. Kullanıcı malzemeleri metin olarak girdiğinde, bu malzemelerle yapılabilecek yoğurt içeren tarifleri öner.
+3. Her tarif için malzeme listesi ve yapılış adımlarını detaylı olarak açıkla.
+4. Eğer eksik malzemeler varsa, alternatif malzemeler veya basitleştirilmiş tarifler öner.
+5. Cevaplarını {dil} olarak ver.
+"""
+
+category_rules = {
+    "Çorba": "\nSadece yoğurt ve çorba içeren tarifleri öner. 'çorba' veya  'Çorba ' kelimesi geçmeyen tarifleri dahil etme.",
+    "Yemek": "\nTatlı ve çorba olmayan, sadece yemek kategorisindeki yoğurt içeren tarifleri öner.",
+    "Tatlı": "\nSadece içinde 'tatlı' geçen yoğurtlu tatlı tariflerini öner.",
+    "Şefin Seçimi": "\nEn iyi birkaç tarifi seçip öner."
+}
+
+system_instruction = base_instruction + category_rules[category]
+system_instruction = system_instruction.replace("{dil}", selected_lang)
+if target_lang_code != "tr":
+    system_instruction = translator.translate(system_instruction, dest=target_lang_code).text
+
+# PDF içeriğini oku
+pdf_path = r"C:\\Users\\SLAYER\\OneDrive\\Desktop\\LLM\\Yogurt\\127743,yogurt-uygarligi-tarifler-v02pdf.pdf"
+text = ""
+
+try:
+    with open(pdf_path, "rb") as file:
+        pdf_reader = PyPDF2.PdfReader(file)
+        for page in pdf_reader.pages:
+            page_text = page.extract_text()
+            if "yoğurt" in page_text.lower():
+                text += page_text
+except Exception as e:
+    st.error("PDF okunurken bir hata oluştu: " + str(e))
+    st.stop()
+
+# Mesaj geçmişi
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# PDF'den ilk öneri alımı
+if "pdf_analyzed" not in st.session_state:
+    user_message = f"Aşağıdaki PDF içeriğinden yalnızca {category.lower()} tariflerini önerir misin?\n\n{text[:3000]}"
+    if target_lang_code != "tr":
+        user_message = translator.translate(user_message, dest=target_lang_code).text
+
+    gemini_messages = [
+        {"role": "user", "parts": [system_instruction]},
+        {"role": "model", "parts": ["Anladım, bu kurallara göre hareket edeceğim."]},
+        {"role": "user", "parts": [user_message]},
+    ]
+    st.session_state.pdf_analyzed = True  # Bu satırı eklemeyi unutma
+
+# Kullanıcı girişi
+prompt_text = "Malzemelerinizi yazın..." if target_lang_code == "tr" else translator.translate("Malzemelerinizi yazın...", dest=target_lang_code).text
+
+# Ortaya hizalamak için boşluklu kolonlar
+center_col1, center_col2, center_col3 = st.columns([1, 18, 1])
+with center_col2:
+    user_input = st.chat_input(prompt_text)
+
+if user_input:
+    if not is_compatible_with_category(user_input, category):
+        warning_text = f"⚠️ Girdiğiniz malzemeler '{category}' kategorisi ile uyuşmuyor. Lütfen farklı bir kategori seçin."
+        if target_lang_code != "tr":
+            warning_text = translator.translate(warning_text, dest=target_lang_code).text
+        st.warning(warning_text)
+    else:
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        with st.chat_message("user"):
+            st.write(user_input)
+
+        gemini_messages = [
+            {"role": "user", "parts": [system_instruction]},
+            {"role": "model", "parts": ["Anladım, bu kurallara göre hareket edeceğim."]},
+        ]
+
+        for msg in st.session_state.messages:
+            role = "user" if msg["role"] == "user" else "model"
+            msg_content = msg["content"]
+            if target_lang_code != "tr":
+                msg_content = translator.translate(msg_content, dest=target_lang_code).text
+            gemini_messages.append({"role": role, "parts": [msg_content]})
+
+        with st.chat_message("assistant"):
+            message_placeholder = st.empty()
+            loading_msg = "Tarifler hazırlanıyor..." if target_lang_code == "tr" else translator.translate("Tarifler hazırlanıyor...", dest=target_lang_code).text
+            message_placeholder.text(loading_msg)
+
+            try:
+                response = model.generate_content(gemini_messages)
+                assistant_response = response.text
+                message_placeholder.write(assistant_response)
+                st.session_state.messages.append({"role": "assistant", "content": assistant_response})
+            except Exception as e:
+                st.error("Bir hata oluştu: " + str(e))
