@@ -1,20 +1,29 @@
-import os
-from dotenv import load_dotenv
-from deep_translator import GoogleTranslator
-import streamlit as st
+<<<<<<< HEAD
 
-from langchain.document_loaders import PyPDFLoader
-from langchain.vectorstores import Chroma
+# yogurt.py
+import streamlit as st
+import os
+import nest_asyncio
+from deep_translator import GoogleTranslator
+
+# ===== Güncel LangChain importları =====
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.vectorstores import FAISS
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 
-# === Streamlit Sayfa Ayarı ===
-st.set_page_config(page_title="Yoğurtlu Mutfak Rehberi", page_icon="🍳")
+# === Async sorununu çözmek için ===
+nest_asyncio.apply()
 
-# === Ortam Değişkenlerini Yükle ===
-load_dotenv()
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+# === Streamlit Sayfa Ayarı ===
+st.set_page_config(page_title="Yoğurtlu Mutfak Rehberi", page_icon="🍳", layout="wide")
+
+# === GOOGLE API KEY (Streamlit Secrets veya .env) ===
+GOOGLE_API_KEY = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    st.error("❌ GOOGLE_API_KEY bulunamadı! Secrets.toml veya .env dosyanızı kontrol edin.")
+    st.stop()
 
 # === Dil Seçenekleri ===
 languages = {
@@ -31,33 +40,48 @@ with col1:
     selected_lang = st.radio("🌐 Language:", options=list(languages.keys()), index=0, horizontal=True)
 target_lang = languages[selected_lang]
 
+# === Çeviri Fonksiyonu ===
 def translate(text, target_lang):
     if target_lang == "tr":
         return text
-    return GoogleTranslator(source='auto', target=target_lang).translate(text)
+    try:
+        return GoogleTranslator(source='auto', target=target_lang).translate(text)
+    except Exception as e:
+        st.warning(f"Çeviri yapılamadı: {e}")
+        return text
 
 # === Uygulama Başlığı ===
-st.title(translate("👨🏻‍🍳 Yoğurtlu Mutfak Rehberi ", target_lang))
+st.title(translate("👨🏻‍🍳 Yoğurtlu Mutfak Rehberi", target_lang))
 st.subheader(translate("Malzeme girişinize göre yoğurtlu tarifler önerilir", target_lang))
 
-# === PDF ve Vektör DB ===
-pdf_path = r"C:\Users\SLAYER\OneDrive\Desktop\LLM\Yogurtluyoo\127743,yogurt-uygarligi-tarifler-v02pdf.pdf"
-persist_directory = "chroma_yogurt"
+# === PDF ve FAISS VectorStore ===
+pdf_path = "yogurt-uygarligi.pdf"
+if not os.path.exists(pdf_path):
+    st.error(f"❌ PDF dosyası bulunamadı: {pdf_path}")
+    st.stop()
 
 @st.cache_resource
 def load_vectordb():
-    embedding = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=GOOGLE_API_KEY)
+    try:
+        # Embedding tanımı
+        embedding = GoogleGenerativeAIEmbeddings(
+            model="models/embedding-001",
+            google_api_key=GOOGLE_API_KEY
+        )
 
-    if not os.path.exists(persist_directory):
+        # PDF yükleme
         loader = PyPDFLoader(pdf_path)
         docs = loader.load()
-        yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
-        vectordb = Chroma.from_documents(yogurt_docs, embedding, persist_directory=persist_directory)
-        vectordb.persist()
-    else:
-        vectordb = Chroma(persist_directory=persist_directory, embedding_function=embedding)
 
-    return vectordb
+        # Sadece yoğurt içeren sayfalar
+        yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
+
+        # FAISS vectorstore
+        vectordb = FAISS.from_documents(yogurt_docs, embedding)
+        return vectordb
+    except Exception as e:
+        st.error(f"Embedding veya FAISS oluşturulamadı: {e}")
+        st.stop()
 
 vectordb = load_vectordb()
 retriever = vectordb.as_retriever(search_kwargs={"k": 4})
@@ -97,6 +121,7 @@ qa_chain = RetrievalQA.from_chain_type(
 input_label = translate("Malzemelerinizi yazın...", target_lang)
 user_input = st.chat_input(input_label)
 
+# Session State
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -104,7 +129,12 @@ if user_input:
     st.chat_message("user").write(user_input)
     st.session_state.messages.append({"role": "user", "content": user_input})
 
-    query_in_tr = GoogleTranslator(source='auto', target='tr').translate(user_input)
+    # Kullanıcı girişi önce Türkçeye çevrilir
+    try:
+        query_in_tr = GoogleTranslator(source='auto', target='tr').translate(user_input)
+    except Exception:
+        query_in_tr = user_input  # Çeviri başarısızsa orijinal kullanılır
+
     with st.chat_message("assistant"):
         with st.spinner(translate("Tarif hazırlanıyor...", target_lang)):
             try:
@@ -114,3 +144,11 @@ if user_input:
                 st.session_state.messages.append({"role": "assistant", "content": result_translated})
             except Exception as e:
                 st.error("❌ " + str(e))
+
+
+
+
+
+
+
+>>>>>>> 63ec242c16dd17f8aa4e35b3b7c8c7b7de5bc088
