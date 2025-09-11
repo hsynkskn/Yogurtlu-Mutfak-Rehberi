@@ -56,7 +56,8 @@ if not os.path.exists(pdf_path):
 
 @st.cache_resource
 def load_vectordb(api_key):
-    loader = PyPDFLoader(pdf_path)
+    # Fonksiyonun içeriği, doğru girintili olmalı
+    loader = PyPDFLoader(pdf_path)  # Bu satırın girintisi doğru olmalı
     raw_docs = loader.load()
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=100)
@@ -64,9 +65,8 @@ def load_vectordb(api_key):
 
     embedding = GoogleGenerativeAIEmbeddings(
         model="models/embedding-001",
-        google_api_key=api_key   # ✅ burada api_key kullan
+        google_api_key=api_key  # ✅ burada api_key kullan
     )
-
     vectordb = FAISS.from_documents(yogurt_docs, embedding)
     return vectordb
 
