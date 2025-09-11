@@ -55,9 +55,8 @@ if not os.path.exists(pdf_path):
     st.stop()
 
 @st.cache_resource
-def load_vectordb():
-    global GOOGLE_API_KEY
-    loader = PyPDFLoader("yogurt-uygarligi.pdf")
+def load_vectordb(api_key):
+    loader = PyPDFLoader(pdf_path)
     raw_docs = loader.load()
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
@@ -65,10 +64,13 @@ def load_vectordb():
 
     embedding = GoogleGenerativeAIEmbeddings(
         model="models/embedding-001",
-        google_api_key=GOOGLE_API_KEY
+        google_api_key=api_key   # ✅ burada api_key kullan
     )
+
     vectordb = FAISS.from_documents(yogurt_docs, embedding)
     return vectordb
+
+vectordb = load_vectordb(api_key)
     # PDF yükleme
     loader = PyPDFLoader(pdf_path)
     docs = loader.load()
