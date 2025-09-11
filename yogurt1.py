@@ -21,7 +21,7 @@ st.set_page_config(page_title="Yoğurtlu Mutfak Rehberi", page_icon="🍳")
 # === Ortam Değişkenlerini Yükle ===
 load_dotenv()
 api_key = os.getenv("GOOGLE_API_KEY")
-embedding = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=api_key)
+#embedding = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=api_key)
 
 # === Dil Seçenekleri ===
 languages = {
@@ -56,12 +56,19 @@ if not os.path.exists(pdf_path):
 
 @st.cache_resource
 def load_vectordb():
-    # Embedding tanımı
+    global GOOGLE_API_KEY
+    loader = PyPDFLoader("veriler/yoğurt_tarifleri.pdf")
+    raw_docs = loader.load()
+
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+    yogurt_docs = text_splitter.split_documents(raw_docs)
+
     embedding = GoogleGenerativeAIEmbeddings(
         model="models/embedding-001",
         google_api_key=GOOGLE_API_KEY
     )
-
+    vectordb = FAISS.from_documents(yogurt_docs, embedding)
+    return vectordb
     # PDF yükleme
     loader = PyPDFLoader(pdf_path)
     docs = loader.load()
