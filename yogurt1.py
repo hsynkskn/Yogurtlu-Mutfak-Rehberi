@@ -11,6 +11,7 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 
+
 # === Event loop uyumluluğu için ===
 nest_asyncio.apply()
 
@@ -19,7 +20,7 @@ st.set_page_config(page_title="Yoğurtlu Mutfak Rehberi", page_icon="🍳")
 
 # === Ortam Değişkenlerini Yükle ===
 load_dotenv()
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 
 # === Dil Seçenekleri ===
 languages = {
