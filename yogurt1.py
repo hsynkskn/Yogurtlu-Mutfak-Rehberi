@@ -48,7 +48,7 @@ st.title(translate("👨🏻‍🍳 Yoğurtlu Mutfak Rehberi", target_lang))
 st.subheader(translate("Malzeme girişinize göre yoğurtlu tarifler önerilir", target_lang))
 
 # === PDF ve FAISS VectorStore ===
-pdf_path = "yogurt-uygarligi.pdf"
+pdf_path = r"yogurt-uygarligi.pdf"
 
 if not os.path.exists(pdf_path):
     st.error(f"❌ PDF dosyası bulunamadı: {pdf_path}")
@@ -59,7 +59,7 @@ def load_vectordb(api_key):
     loader = PyPDFLoader(pdf_path)
     raw_docs = loader.load()
 
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=100)
     yogurt_docs = text_splitter.split_documents(raw_docs)
 
     embedding = GoogleGenerativeAIEmbeddings(
