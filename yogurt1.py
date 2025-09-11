@@ -57,7 +57,7 @@ if not os.path.exists(pdf_path):
 @st.cache_resource
 def load_vectordb(api_key):
     # Fonksiyonun içeriği, doğru girintili olmalı
-    loader = PyPDFLoader(pdf_path)  # Bu satırın girintisi doğru olmalı
+    loader = PyPDFLoader(pdf_path)
     raw_docs = loader.load()
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=100)
@@ -65,30 +65,18 @@ def load_vectordb(api_key):
 
     embedding = GoogleGenerativeAIEmbeddings(
         model="models/embedding-001",
-        google_api_key=api_key  # ✅ burada api_key kullan
+        google_api_key=api_key
     )
     vectordb = FAISS.from_documents(yogurt_docs, embedding)
     return vectordb
 
 vectordb = load_vectordb(api_key)
-    # PDF yükleme
-    loader = PyPDFLoader(pdf_path)
-    docs = loader.load()
-    
-    # Sadece yoğurt içeren sayfalar
-    yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
-
-    # FAISS vectorstore
-    vectordb = FAISS.from_documents(yogurt_docs, embedding)
-    return vectordb
-
-vectordb = load_vectordb()
 retriever = vectordb.as_retriever(search_kwargs={"k": 4})
 
 # === LLM Tanımı ===
 llm = ChatGoogleGenerativeAI(
     model="gemini-1.5-flash",
-    google_api_key=GOOGLE_API_KEY
+    google_api_key=api_key
 )
 
 # === Prompt Tanımı ===
