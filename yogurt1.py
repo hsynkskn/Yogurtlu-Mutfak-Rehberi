@@ -1,130 +1,89 @@
 import os
-import nest_asyncio
-from dotenv import load_dotenv
-from deep_translator import GoogleTranslator
 import streamlit as st
-
-# ===== Güncel LangChain importları =====
+from dotenv import load_dotenv
 from langchain_community.document_loaders import PyPDFLoader
-from langchain_community.vectorstores import FAISS
-from langchain.prompts import PromptTemplate
-from langchain.chains import RetrievalQA
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+from langchain_community.vectorstores import FAISS
+from langchain.chains import RetrievalQA
+from deep_translator import GoogleTranslator
+import nest_asyncio
 
-# === Event loop uyumluluğu için ===
+# --- Gerekli ayarlar ---
 nest_asyncio.apply()
-
-# === Streamlit Sayfa Ayarı ===
-st.set_page_config(page_title="Yoğurtlu Mutfak Rehberi", page_icon="🍳")
-
-# === Ortam Değişkenlerini Yükle ===
 load_dotenv()
+
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-
-# === Dil Seçenekleri ===
-languages = {
-    "Türkçe TR": "tr",
-    "English GB": "en",
-    "Français FR": "fr",
-    "Deutsch DE": "de",
-    "Español ES": "es",
-    "Русский RU": "ru"
-}
-
-col1, col2 = st.columns([6, 4])
-with col1:
-    selected_lang = st.radio("🌐 Language:", options=list(languages.keys()), index=0, horizontal=True)
-target_lang = languages[selected_lang]
-
-def translate(text, target_lang):
-    if target_lang == "tr":
-        return text
-    return GoogleTranslator(source='auto', target=target_lang).translate(text)
-
-# === Uygulama Başlığı ===
-st.title(translate("👨🏻‍🍳 Yoğurtlu Mutfak Rehberi", target_lang))
-st.subheader(translate("Malzeme girişinize göre yoğurtlu tarifler önerilir", target_lang))
-
-# === PDF ve FAISS VectorStore ===
-pdf_path = r"yogurt-uygarligi.pdf"
-
-if not os.path.exists(pdf_path):
-    st.error(f"❌ PDF dosyası bulunamadı: {pdf_path}")
+if not GOOGLE_API_KEY:
+    st.error("⚠️ GOOGLE_API_KEY bulunamadı. Lütfen .env dosyanıza ekleyin.")
     st.stop()
 
+# --- PDF yükleme ---
 @st.cache_resource
 def load_vectordb():
-    # Embedding tanımı (Gemini 2.0 için de aynı embedding kullanılabilir)
-    embedding = GoogleGenerativeAIEmbeddings(
-        model="models/embedding-001",
-        google_api_key=GOOGLE_API_KEY
-    )
+    # PDF dosyalarını oku
+    docs = []
+    pdf_files = ["data/yogurt-recipes.pdf"]  # PDF dosyalarının yolu
+    for pdf in pdf_files:
+        loader = PyPDFLoader(pdf)
+        docs.extend(loader.load())
 
-    # PDF yükleme
-    loader = PyPDFLoader(pdf_path)
-    docs = loader.load()
-    
-    # Sadece yoğurt içeren sayfalar
-    yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
+    # Küçük parçalara böl
+    splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
+    yogurt_docs = splitter.split_documents(docs)
 
-    # FAISS vectorstore
+    # Embedding
+    embedding = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=GOOGLE_API_KEY)
+
+    # FAISS veritabanı oluştur
     vectordb = FAISS.from_documents(yogurt_docs, embedding)
     return vectordb
 
 vectordb = load_vectordb()
-retriever = vectordb.as_retriever(search_kwargs={"k": 4})
 
-# === LLM Tanımı (Gemini 2.0 Flash veya Pro) ===
-llm = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash",   # 🚀 Hızlı ve uygun maliyetli
-    # model="gemini-2.0-pro",   # Daha güçlü ama biraz daha yavaş
-    google_api_key=GOOGLE_API_KEY
-)
-
-# === Prompt Tanımı ===
-prompt_template = PromptTemplate(
-    input_variables=["context", "question"],
-    template="""
-Sen bir şef asistanısın. Aşağıda yoğurtla ilgili tarif bilgileri içeren bir metin var:
-
-{context}
-
-Kullanıcının verdiği malzemelere uygun, sadece yoğurt içeren tarifler öner.
-Türk mutfağına öncelik ver. Malzeme listesi ve yapılış adımlarını yaz.
-Sade, akıcı ve kullanıcı dostu bir dille yaz. Gerekiyorsa alternatif malzemeler de öner.
-
-Malzemeler: {question}
-"""
-)
-
-# === QA Zinciri Tanımı ===
+# --- Model ve QA chain ---
+llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro", google_api_key=GOOGLE_API_KEY)
 qa_chain = RetrievalQA.from_chain_type(
     llm=llm,
-    retriever=retriever,
-    chain_type="stuff",
-    return_source_documents=False,
-    chain_type_kwargs={"prompt": prompt_template}
+    retriever=vectordb.as_retriever(search_kwargs={"k": 3}),
+    return_source_documents=True
 )
 
-# === Kullanıcı Girişi ===
-input_label = translate("Malzemelerinizi yazın...", target_lang)
-user_input = st.chat_input(input_label)
+# --- Streamlit Arayüzü ---
+st.title("🥛 Yoğurtlu Mutfak Rehberi")
+st.write("PDF tabanlı çok dilli yoğurt tarifleri asistanı")
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+languages = {
+    "English": "en",
+    "Français": "fr",
+    "Deutsch": "de",
+    "Español": "es",
+    "Русский": "ru",
+    "Türkçe": "tr"
+}
 
-if user_input:
-    st.chat_message("user").write(user_input)
-    st.session_state.messages.append({"role": "user", "content": user_input})
+lang_choice = st.selectbox("Dil seçin:", list(languages.keys()))
 
-    # Kullanıcı girişi önce Türkçeye çevrilir
-    query_in_tr = GoogleTranslator(source='auto', target='tr').translate(user_input)
-    with st.chat_message("assistant"):
-        with st.spinner(translate("Tarif hazırlanıyor...", target_lang)):
-            try:
-                result = qa_chain.run(query_in_tr)
-                result_translated = translate(result, target_lang)
-                st.write(result_translated)
-                st.session_state.messages.append({"role": "assistant", "content": result_translated})
-            except Exception as e:
-                st.error("❌ " + str(e))
+user_q = st.text_input("Bir tarif sorusu yazın:")
+
+if st.button("Sor"):
+    if user_q:
+        # Kullanıcı sorusunu İngilizceye çevir
+        q_en = GoogleTranslator(source=languages[lang_choice], target="en").translate(user_q)
+
+        # Yanıt al
+        response = qa_chain({"query": q_en})
+        answer_en = response["result"]
+
+        # Yanıtı seçilen dile çevir
+        answer_translated = GoogleTranslator(source="en", target=languages[lang_choice]).translate(answer_en)
+
+        st.subheader("Cevap:")
+        st.write(answer_translated)
+
+        with st.expander("Kaynaklar"):
+            for doc in response["source_documents"]:
+                st.write(doc.metadata.get("source", "Bilinmiyor"))
+    else:
+        st.warning("Lütfen bir soru yazın.")
+
