@@ -23,7 +23,7 @@ if not GOOGLE_API_KEY:
 def load_vectordb():
     # PDF dosyalarını oku
     docs = []
-    pdf_files = ["https://github.com/hsynkskn/Yogurtlu-Mutfak-Rehberi/blob/c87246a703eafaf3f489093514fa2175006071e6/yogurt-uygarligi.pdf"]  # PDF dosyalarının yolu
+    pdf_files = ["yogurt-uygarligi.pdf"]  # PDF dosyalarının yolu
     for pdf in pdf_files:
         loader = PyPDFLoader(pdf)
         docs.extend(loader.load())
