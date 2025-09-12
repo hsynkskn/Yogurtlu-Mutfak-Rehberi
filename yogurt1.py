@@ -10,7 +10,6 @@ from langchain_community.vectorstores import FAISS
 from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 # === Event loop uyumluluğu için ===
 nest_asyncio.apply()
@@ -20,8 +19,7 @@ st.set_page_config(page_title="Yoğurtlu Mutfak Rehberi", page_icon="🍳")
 
 # === Ortam Değişkenlerini Yükle ===
 load_dotenv()
-api_key = os.getenv("GOOGLE_API_KEY")
-
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # === Dil Seçenekleri ===
 languages = {
@@ -55,28 +53,32 @@ if not os.path.exists(pdf_path):
     st.stop()
 
 @st.cache_resource
-def load_vectordb(api_key):
-    # Fonksiyonun içeriği, doğru girintili olmalı
-    loader = PyPDFLoader(pdf_path)
-    raw_docs = loader.load()
-
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1500, chunk_overlap=100)
-    yogurt_docs = text_splitter.split_documents(raw_docs)
-
+def load_vectordb():
+    # Embedding tanımı (Gemini 2.0 için de aynı embedding kullanılabilir)
     embedding = GoogleGenerativeAIEmbeddings(
         model="models/embedding-001",
-        google_api_key=api_key
+        google_api_key=GOOGLE_API_KEY
     )
+
+    # PDF yükleme
+    loader = PyPDFLoader(pdf_path)
+    docs = loader.load()
+    
+    # Sadece yoğurt içeren sayfalar
+    yogurt_docs = [doc for doc in docs if "yoğurt" in doc.page_content.lower()]
+
+    # FAISS vectorstore
     vectordb = FAISS.from_documents(yogurt_docs, embedding)
     return vectordb
 
-vectordb = load_vectordb(api_key)
+vectordb = load_vectordb()
 retriever = vectordb.as_retriever(search_kwargs={"k": 4})
 
-# === LLM Tanımı ===
+# === LLM Tanımı (Gemini 2.0 Flash veya Pro) ===
 llm = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash",
-    google_api_key=api_key
+    model="gemini-2.0-flash",   # 🚀 Hızlı ve uygun maliyetli
+    # model="gemini-2.0-pro",   # Daha güçlü ama biraz daha yavaş
+    google_api_key=GOOGLE_API_KEY
 )
 
 # === Prompt Tanımı ===
