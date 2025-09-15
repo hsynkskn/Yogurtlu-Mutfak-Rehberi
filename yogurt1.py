@@ -10,20 +10,18 @@ from langchain_text_splitters import CharacterTextSplitter
 from langchain.schema import HumanMessage, AIMessage
 
 # --- API Anahtarı Yönetimi ---
-# Streamlit Cloud'da 'Secrets' bölümüne GEMINI_API_KEY olarak anahtarınızı ekleyin.
-# Yerel ortamda çalıştırıyorsanız, bu satırı yorum satırı yapıp
-# 'export GEMINI_API_KEY="AIza..."' komutunu terminalde çalıştırabilirsiniz.
+# Streamlit Cloud'da 'Secrets' bölümüne GOOGLE_API_KEY olarak anahtarınızı eklemiştiniz.
+# Bu kod, bu isme göre anahtarınızı çekecektir.
 try:
     # Streamlit Cloud için st.secrets'tan API anahtarını alıyoruz
-    gemini_api_key = st.secrets["GEMINI_API_KEY"]
-    os.environ["GOOGLE_API_KEY"] = gemini_api_key # Langchain için de ayarla
+    gemini_api_key = st.secrets["GOOGLE_API_KEY"] # <-- Düzeltme burada yapıldı!
+    os.environ["GOOGLE_API_KEY"] = gemini_api_key # Langchain ve Google kütüphaneleri için de ayarla
 except KeyError:
-    st.error("GEMINI_API_KEY Streamlit Secrets'ta bulunamadı. Lütfen anahtarınızı ayarlayın.")
+    st.error("GOOGLE_API_KEY Streamlit Secrets'ta bulunamadı. Lütfen Streamlit Cloud'da 'Secrets' bölümünü kontrol edin.")
     st.stop() # Anahtar yoksa uygulamayı durdur
 
 # --- Embedding ve LLM Modellerini Yükleme ---
-# Bu modellerin yüklenmesi ve yapılandırılması da önbelleğe alınabilir, ancak
-# genellikle tek seferlik olduğu için @st.cache_resource ile önbelleğe alınması en iyisidir.
+# Bu modellerin yüklenmesi ve yapılandırılması @st.cache_resource ile önbelleğe alınır.
 @st.cache_resource
 def get_embedding_model():
     """Embedding modelini yükler ve önbelleğe alır."""
@@ -73,13 +71,14 @@ def load_vectordb():
         st.success("Vektör veritabanı başarıyla hazırlandı!")
         return vectordb
     except Exception as e:
-        st.error(f"FAISS vektör veritabanı oluşturulurken hata oluştu: {e}. Detaylar: {e}")
-        st.info("Bu genellikle API kotası aşıldığında veya API anahtarıyla ilgili bir sorun olduğunda meydana gelir.")
+        st.error(f"FAISS vektör veritabanı oluşturulurken hata oluştu: {e}")
+        st.info("Bu genellikle API kotası aşıldığında veya API anahtarıyla ilgili bir sorun olduğunda meydana gelir. Lütfen Streamlit Cloud loglarını kontrol edin.")
         st.stop()
 
 # --- RAG Zinciri Oluşturma ---
+@st.cache_resource
 def create_rag_chain():
-    """RAG (Retrieval Augmented Generation) zincirini oluşturur."""
+    """RAG (Retrieval Augmented Generation) zincirini oluşturur ve önbelleğe alır."""
     llm = get_llm_model() # Önbelleğe alınmış LLM modelini kullan
     vectordb = load_vectordb() # Önbelleğe alınmış vektör veritabanını kullan
 
