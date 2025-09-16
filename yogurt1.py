@@ -52,7 +52,7 @@ def load_vectordb(pdf_folder="pdfs", db_path="faiss_index"):
 
 @st.cache_resource  # <-- cache_data yerine cache_resource
 def load_vectordb_local(db_path="faiss_index"):
-    if Path(db_path).exists():
+    if os.path.exists(db_path):
         embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
         return FAISS.load_local(db_path, embeddings)
     return None
