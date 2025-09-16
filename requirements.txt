@@ -37,7 +37,7 @@ torch==2.8.0
 langchain-community==0.3.29
 faiss-cpu==1.12.0
 pydantic==2.11.1
-rich==14.1.0
+rich>=10.14.0,<14
 markdown-it-py==4.0.0
 mdurl==0.1.2
 pygments==2.19.2
