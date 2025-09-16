@@ -31,14 +31,15 @@ target_lang = languages[selected_lang]
 @st.cache_resource
 def load_vectordb_local(db_path="faiss_index"):
     if os.path.exists(db_path):
-        st.info(f"{db_path} bulundu, FAISS yükleniyor...")
         embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-        vectordb = FAISS.load_local(db_path, embeddings)
-        st.success("FAISS veritabanı başarıyla yüklendi ✅")
-        return vectordb
-    st.warning(f"{db_path} bulunamadı, yeni veritabanı oluşturulacak.")
+        return FAISS.load_local(db_path, embeddings)
     return None
 
+def load_vectordb(pdf_folder="pdfs", db_path="faiss_index"):
+    pdf_folder_path = Path(pdf_folder)
+    if not pdf_folder_path.exists():
+        st.error(f"{pdf_folder} klasörü bulunamadı.")
+        return None
 
     docs = []
     for pdf_file in pdf_folder_path.glob("*.pdf"):
@@ -54,6 +55,7 @@ def load_vectordb_local(db_path="faiss_index"):
     vectordb.save_local(db_path)
     st.success("Vektör veritabanı oluşturuldu ve kaydedildi ✅")
     return vectordb
+
 
 @st.cache_resource  # <-- cache_data yerine cache_resource
 def load_vectordb_local(db_path="faiss_index"):
@@ -98,11 +100,9 @@ def create_rag_chain(_vectordb):
     llm = get_llm_local()
 
     def rag_answer(query):
-        # Benzer dokümanları bul
         docs = _vectordb.similarity_search(query, k=3)
         context_text = "\n".join([doc.page_content for doc in docs])
-        
-        # Prompt ve dil çevirisi
+
         input_text = prompt_template.format(context=context_text, question=query)
         if target_lang != "tr":
             input_text = GoogleTranslator(source="tr", target=target_lang).translate(input_text)
@@ -110,7 +110,6 @@ def create_rag_chain(_vectordb):
         result = llm(input_text)
         answer = result[0]["generated_text"]
 
-        # Eğer hedef dil Türkçe değilse cevabı tekrar çevir
         if target_lang != "tr":
             answer = GoogleTranslator(source=target_lang, target="tr").translate(answer)
 
