@@ -4,27 +4,22 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGener
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_community.document_loaders import TextLoader
+from langchain_community.document_loaders import PyPDFLoader  # <-- Burada değişiklik
 from langchain_community.vectorstores import FAISS
 from langchain_text_splitters import CharacterTextSplitter
 from langchain.schema import HumanMessage, AIMessage
 
 # --- API Anahtarı Yönetimi ---
-# Streamlit Cloud'da 'Secrets' bölümüne GOOGLE_API_KEY olarak anahtarınızı eklemiştiniz.
-# Bu kod, bu isme göre anahtarınızı çekecektir.
 try:
-    # Streamlit Cloud için st.secrets'tan API anahtarını alıyoruz
-    gemini_api_key = st.secrets["GOOGLE_API_KEY"] # <-- Düzeltme burada yapıldı!
-    os.environ["GOOGLE_API_KEY"] = gemini_api_key # Langchain ve Google kütüphaneleri için de ayarla
+    gemini_api_key = st.secrets["GOOGLE_API_KEY"]
+    os.environ["GOOGLE_API_KEY"] = gemini_api_key
 except KeyError:
     st.error("GOOGLE_API_KEY Streamlit Secrets'ta bulunamadı. Lütfen Streamlit Cloud'da 'Secrets' bölümünü kontrol edin.")
-    st.stop() # Anahtar yoksa uygulamayı durdur
+    st.stop()
 
 # --- Embedding ve LLM Modellerini Yükleme ---
-# Bu modellerin yüklenmesi ve yapılandırılması @st.cache_resource ile önbelleğe alınır.
 @st.cache_resource
 def get_embedding_model():
-    """Embedding modelini yükler ve önbelleğe alır."""
     try:
         return GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     except Exception as e:
@@ -33,38 +28,34 @@ def get_embedding_model():
 
 @st.cache_resource
 def get_llm_model():
-    """LLM modelini yükler ve önbelleğe alır."""
     try:
         return ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.7)
     except Exception as e:
         st.error(f"LLM modeli yüklenirken hata oluştu: {e}")
         st.stop()
 
-# --- Vektör Veritabanını Yükleme/Oluşturma (Önbellekli) ---
+# --- Vektör Veritabanını Yükleme/Oluşturma ---
 @st.cache_resource(show_spinner="Vektör veritabanı hazırlanıyor...")
 def load_vectordb():
-    """Belgeleri yükler, böler, gömer ve FAISS vektör veritabanını oluşturur.
-    Bu işlem Streamlit tarafından önbelleğe alınır, böylece kota aşımı önlenir."""
-    
-    st.info("Vektör veritabanı ilk kez oluşturuluyor/yükleniyor. Bu biraz zaman alabilir.")
+    st.info("PDF dosyası yükleniyor ve vektör veritabanı oluşturuluyor...")
 
-    # 1. Metin Dosyasını Yükle
+    # 1. PDF Dosyasını Yükle
     try:
-        loader = TextLoader("yogurt_tarifleri.txt", encoding="utf-8")
+        loader = PyPDFLoader("yogurt-uygarligi.pdf")  # <-- Burada değişiklik
         documents = loader.load()
     except FileNotFoundError:
-        st.error("yogurt_tarifleri.txt dosyası bulunamadı. Lütfen dosyanın uygulamanızla aynı dizinde olduğundan emin olun.")
+        st.error("yogurt-uygarligi.pdf dosyası bulunamadı. Lütfen dosyanın uygulamanızla aynı dizinde olduğundan emin olun.")
         st.stop()
     except Exception as e:
-        st.error(f"Metin dosyası yüklenirken hata oluştu: {e}")
+        st.error(f"PDF dosyası yüklenirken hata oluştu: {e}")
         st.stop()
 
     # 2. Metni Parçalara Ayır
     text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
     yogurt_docs = text_splitter.split_documents(documents)
 
-    # 3. Embedding Modelini Kullanarak Gömme ve FAISS Oluşturma
-    embedding = get_embedding_model() # Önbelleğe alınmış embedding modelini kullan
+    # 3. Embedding Modelini Kullanarak FAISS Oluştur
+    embedding = get_embedding_model()
     
     try:
         vectordb = FAISS.from_documents(yogurt_docs, embedding)
@@ -72,17 +63,14 @@ def load_vectordb():
         return vectordb
     except Exception as e:
         st.error(f"FAISS vektör veritabanı oluşturulurken hata oluştu: {e}")
-        st.info("Bu genellikle API kotası aşıldığında veya API anahtarıyla ilgili bir sorun olduğunda meydana gelir. Lütfen Streamlit Cloud loglarını kontrol edin.")
         st.stop()
 
 # --- RAG Zinciri Oluşturma ---
 @st.cache_resource
 def create_rag_chain():
-    """RAG (Retrieval Augmented Generation) zincirini oluşturur ve önbelleğe alır."""
-    llm = get_llm_model() # Önbelleğe alınmış LLM modelini kullan
-    vectordb = load_vectordb() # Önbelleğe alınmış vektör veritabanını kullan
+    llm = get_llm_model()
+    vectordb = load_vectordb()
 
-    # RAG için prompt şablonu
     prompt = ChatPromptTemplate.from_messages([
         ("system", "Sen uzman bir yoğurtlu tarifler şefisin. Kullanıcının sorusunu belgelerden alınan bilgilere göre yanıtla. Yalnızca verilen belgelerdeki bilgileri kullan."),
         ("human", "{input}"),
@@ -90,13 +78,9 @@ def create_rag_chain():
     ])
 
     document_chain = create_stuff_documents_chain(llm, prompt)
-    
-    # Retriever oluştur (en alakalı 4 belgeyi getir)
     retriever = vectordb.as_retriever(search_kwargs={"k": 4})
-    
-    # Retrieval zincirini oluştur
     retrieval_chain = create_retrieval_chain(retriever, document_chain)
-    
+
     return retrieval_chain
 
 # --- Streamlit Uygulaması ---
@@ -104,10 +88,8 @@ st.set_page_config(page_title="Yoğurtlu Mutfak Rehberi", layout="centered")
 st.title("👨‍🍳 Yoğurtlu Mutfak Rehberi")
 st.write("Yoğurt ile hazırlanan tarifler hakkında bana sorular sorabilirsiniz!")
 
-# RAG zincirini yükle (ilk çalıştırmada biraz zaman alabilir)
 rag_chain = create_rag_chain()
 
-# Sohbet geçmişini saklamak için Streamlit session state kullan
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -124,7 +106,6 @@ for message in st.session_state.messages:
 user_query = st.chat_input("Yoğurtla ne yapabilirim?")
 
 if user_query:
-    # Kullanıcının mesajını sohbet geçmişine ekle
     st.session_state.messages.append(HumanMessage(content=user_query))
     with st.chat_message("user"):
         st.markdown(user_query)
@@ -132,12 +113,9 @@ if user_query:
     with st.chat_message("assistant"):
         with st.spinner("Yanıt aranıyor..."):
             try:
-                # RAG zinciri ile yanıt al
                 response = rag_chain.invoke({"input": user_query})
                 ai_response_content = response["answer"]
                 st.markdown(ai_response_content)
                 st.session_state.messages.append(AIMessage(content=ai_response_content))
             except Exception as e:
                 st.error(f"Yanıt alınırken hata oluştu: {e}")
-                st.info("Lütfen bir süre bekleyip tekrar deneyin veya Google Cloud konsolunuzdaki kotanızı kontrol edin.")
-
