@@ -9,6 +9,7 @@ from langchain.schema import Document
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from deep_translator import GoogleTranslator
 
+
 # ================== Dil Seçimi ==================
 languages = {
     "Türkçe TR": "tr",
@@ -52,7 +53,9 @@ def load_vectordb(pdf_folder="pdfs", db_path="faiss_index"):
 @st.cache_data
 def load_vectordb_local(db_path="faiss_index"):
     if Path(db_path).exists():
-        return FAISS.load_local(db_path, embedding=None)
+        # embedding objesini oluştur
+        embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        return FAISS.load_local(db_path, embeddings)
     return None
 
 # ================== HuggingFace Local Model ==================
