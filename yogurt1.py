@@ -58,7 +58,7 @@ def get_llm_local():
 
 # ======= RAG Chain Oluşturma =======
 @st.cache_resource
-def create_rag_chain(vectordb):
+def create_rag_chain(_vectordb):
     llm = get_llm_local()
 
     # Basit retrieval + generation pipeline
