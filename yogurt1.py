@@ -7,6 +7,7 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain, ConversationalRetrievalChain
 from langchain.schema import Document
+from langchain.embeddings import HuggingFaceEmbeddings
 
 # ======= PDF Yükleme ve Vektör DB Oluşturma =======
 @st.cache_data
@@ -27,7 +28,8 @@ def load_vectordb(pdf_folder="pdfs", db_path="faiss_index"):
         return None
 
     # FAISS ile vektör DB oluştur
-    vectordb = FAISS.from_documents(docs, embedding=None)  # embedding None, çünkü pipeline kendisi kullanacak
+    embeddings = HuggingFaceEmbeddings()  # HuggingFace tabanlı embedding
+    vectordb = FAISS.from_documents(docs, embeddings)
     vectordb.save_local(db_path)
     st.success("Vektör veritabanı oluşturuldu ve kaydedildi ✅")
     return vectordb
