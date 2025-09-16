@@ -1,90 +1,91 @@
 import os
+import streamlit as st
 import nest_asyncio
 from dotenv import load_dotenv
 from deep_translator import GoogleTranslator
-import streamlit as st
 
-# ===== LangChain importları =====
+# LangChain ve ilgili kütüphaneler
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.vectorstores import FAISS
-from langchain.prompts import PromptTemplate
-from langchain.chains import RetrievalQA
-from langchain.memory import ConversationBufferMemory
-#from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_community.llms import HuggingFaceHub
-from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.text_splitter import CharacterTextSplitter
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.llms import HuggingFaceHub
+from langchain.chains import ConversationalRetrievalChain
 
-# ===== API Anahtarı =====
+# Ortam değişkenlerini yükle
 load_dotenv()
-import google.generativeai as genai
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-
-# ===== Patch: asyncio uyumsuzluğu çözmek için =====
 nest_asyncio.apply()
 
-# ===== Embedding Model (HuggingFace) =====
-@st.cache_resource
+# =======================
+# Embedding Model
+# =======================
 def get_embedding_model():
-    return HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    return HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
-# ===== FAISS DB yükleme/kaydetme =====
-@st.cache_resource
+# =======================
+# HuggingFace LLM
+# =======================
+def get_llm():
+    return HuggingFaceHub(
+        repo_id="google/flan-t5-base",  # ücretsiz küçük model
+        model_kwargs={"temperature": 0.2, "max_length": 512}
+    )
+
+# =======================
+# FAISS Vektör DB
+# =======================
+FAISS_PATH = "faiss_index"
+
+@st.cache_resource(show_spinner="Vektör veritabanı hazırlanıyor...")
 def load_vectordb():
-    persist_directory = "faiss_index"
-
-    if os.path.exists(persist_directory):
-        vectordb = FAISS.load_local(persist_directory, get_embedding_model(), allow_dangerous_deserialization=True)
+    if os.path.exists(FAISS_PATH):
+        vectordb = FAISS.load_local(
+            FAISS_PATH, get_embedding_model(), allow_dangerous_deserialization=True
+        )
+        st.success("Vektör veritabanı diskten yüklendi ✅")
+        return vectordb
     else:
-        loader = PyPDFLoader("yogurt-recipes.pdf")  # kendi PDF dosyanı koy
+        loader = PyPDFLoader("yogurt-uygarligi.pdf")
         documents = loader.load()
-
-        # Metin parçalayıcı
-        text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+        text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
         yogurt_docs = text_splitter.split_documents(documents)
 
-        # HuggingFace embedding kullan
         embedding = get_embedding_model()
         vectordb = FAISS.from_documents(yogurt_docs, embedding)
+        vectordb.save_local(FAISS_PATH)
+        st.success("Vektör veritabanı oluşturuldu ve kaydedildi ✅")
+        return vectordb
 
-        # Kaydet
-        vectordb.save_local(persist_directory)
+# =======================
+# RAG Zinciri
+# =======================
+@st.cache_resource(show_spinner="RAG zinciri hazırlanıyor...")
+def create_rag_chain():
+    vectordb = load_vectordb()
+    llm = get_llm()
+    rag_chain = ConversationalRetrievalChain.from_llm(
+        llm=llm,
+        retriever=vectordb.as_retriever()
+    )
+    return rag_chain
 
-    return vectordb
+# =======================
+# Streamlit Arayüz
+# =======================
+st.title("🥛 Yoğurtlu Mutfak Asistanı (HuggingFace sürümü)")
 
-# ===== LLM (Gemini) =====
-@st.cache_resource
-def get_llm():
-    return ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.3)
+rag_chain = create_rag_chain()
 
-# ===== Streamlit Uygulaması =====
-st.set_page_config(page_title="Yoğurtlu Mutfak Asistanı", layout="wide")
-st.title("🥛 Yoğurtlu Mutfak Asistanı")
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
-# Vektör DB
-vectordb = load_vectordb()
-retriever = vectordb.as_retriever(search_kwargs={"k": 5})
+user_input = st.text_input("Soru sor:", "")
 
-# Bellek
-memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+if user_input:
+    result = rag_chain.invoke({"question": user_input, "chat_history": st.session_state.chat_history})
 
-# Soru-Cevap zinciri
-llm = get_llm()
-qa_chain = RetrievalQA.from_chain_type(
-    llm=llm,
-    retriever=retriever,
-    memory=memory,
-    chain_type="stuff"
-)
+    st.session_state.chat_history.append((user_input, result["answer"]))
 
-# Kullanıcı input
-user_query = st.text_input("Tarif veya soru sorun (ör: 'Yoğurtlu çorba tarifi'):")
+    st.write("### Yanıt:")
+    st.write(result["answer"])
 
-if user_query:
-    response = qa_chain.run(user_query)
-
-    # Çeviri (isteğe bağlı)
-    translated_response = GoogleTranslator(source="auto", target="tr").translate(response)
-
-    st.markdown("### 🍽️ Asistanın Yanıtı")
-    st.write(translated_response)
