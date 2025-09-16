@@ -34,9 +34,13 @@
 streamlit==1.29.0
 transformers==4.40.0
 torch==2.8.0
-langchain-community==0.0.276
+langchain-community==0.3.29
 faiss-cpu==1.7.4
 pydantic==2.11.1
+rich==14.1.0
+markdown-it-py==4.0.0
+mdurl==0.1.2
+pygments==2.19.2
 
 
 
