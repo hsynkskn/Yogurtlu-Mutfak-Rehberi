@@ -43,7 +43,7 @@ pypdf>=3.17.4
 transformers==4.43.0
 sentence-transformers==5.1.0
 torch==2.8.0
-eep-translator==1.10.0
+deep-translator==1.10.0
 
 
 
