@@ -28,7 +28,6 @@ with col1:
 target_lang = languages[selected_lang]
 
 # ================== PDF Yükleme ve Vektör DB ==================
-@st.cache_resource
 def load_vectordb_local(db_path="faiss_index"):
     if os.path.exists(db_path):
         embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
@@ -55,6 +54,7 @@ def load_vectordb(pdf_folder="pdfs", db_path="faiss_index"):
     vectordb.save_local(db_path)
     st.success("Vektör veritabanı oluşturuldu ve kaydedildi ✅")
     return vectordb
+
 
 
 @st.cache_resource  # <-- cache_data yerine cache_resource
@@ -117,12 +117,12 @@ def create_rag_chain(_vectordb):
 
     return rag_answer
 
+
 # ================== Streamlit UI ==================
 st.title("Yoğurtlu Mutfak Asistanı - Offline RAG 🌐")
 
 vectordb = load_vectordb_local() or load_vectordb()
-
-if vectordb is not None:
+if vectordb:
     rag_chain = create_rag_chain(vectordb)
     user_question = st.text_input("Malzemeleri yazınız:")
     if user_question:
@@ -131,5 +131,6 @@ if vectordb is not None:
             st.markdown(f"**Cevap:** {answer}")
 else:
     st.warning("Vektör veritabanı yüklenemedi.")
+
 
 
