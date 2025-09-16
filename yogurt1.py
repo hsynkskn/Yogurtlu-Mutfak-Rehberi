@@ -28,12 +28,17 @@ with col1:
 target_lang = languages[selected_lang]
 
 # ================== PDF Yükleme ve Vektör DB ==================
-@st.cache_resource  # <-- cache_data yerine cache_resource
-def load_vectordb(pdf_folder="pdfs", db_path="faiss_index"):
-    pdf_folder_path = Path(pdf_folder)
-    if not pdf_folder_path.exists():
-        st.error(f"{pdf_folder} klasörü bulunamadı.")
-        return None
+@st.cache_resource
+def load_vectordb_local(db_path="faiss_index"):
+    if os.path.exists(db_path):
+        st.info(f"{db_path} bulundu, FAISS yükleniyor...")
+        embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        vectordb = FAISS.load_local(db_path, embeddings)
+        st.success("FAISS veritabanı başarıyla yüklendi ✅")
+        return vectordb
+    st.warning(f"{db_path} bulunamadı, yeni veritabanı oluşturulacak.")
+    return None
+
 
     docs = []
     for pdf_file in pdf_folder_path.glob("*.pdf"):
