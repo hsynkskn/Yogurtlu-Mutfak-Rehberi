@@ -1,126 +1,89 @@
-import streamlit as st
 import os
-from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-from langchain.chains import create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain_core.prompts import ChatPromptTemplate
+import nest_asyncio
+from dotenv import load_dotenv
+from deep_translator import GoogleTranslator
+import streamlit as st
+
+# ===== LangChain importları =====
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.vectorstores import FAISS
-from langchain_text_splitters import CharacterTextSplitter
-from langchain.schema import HumanMessage, AIMessage
+from langchain.prompts import PromptTemplate
+from langchain.chains import RetrievalQA
+from langchain.memory import ConversationBufferMemory
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain.text_splitter import CharacterTextSplitter
 
-# ======================
-#  API Anahtarı Yönetimi
-# ======================
-try:
-    gemini_api_key = st.secrets["GOOGLE_API_KEY"]
-    os.environ["GOOGLE_API_KEY"] = gemini_api_key
-except KeyError:
-    st.error("GOOGLE_API_KEY Streamlit Secrets'ta bulunamadı. Lütfen Streamlit Cloud'da 'Secrets' bölümünü kontrol edin.")
-    st.stop()
+# ===== API Anahtarı =====
+load_dotenv()
+import google.generativeai as genai
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-# ======================
-#  Modeller
-# ======================
+# ===== Patch: asyncio uyumsuzluğu çözmek için =====
+nest_asyncio.apply()
+
+# ===== Embedding Model (HuggingFace) =====
 @st.cache_resource
 def get_embedding_model():
-    try:
-        return GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    except Exception as e:
-        st.error(f"Embedding modeli yüklenirken hata oluştu: {e}")
-        st.stop()
+    return HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
+# ===== FAISS DB yükleme/kaydetme =====
 @st.cache_resource
-def get_llm_model():
-    try:
-        return ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.7)
-    except Exception as e:
-        st.error(f"LLM modeli yüklenirken hata oluştu: {e}")
-        st.stop()
-
-# ======================
-#  Vektör Veritabanı
-# ======================
-FAISS_PATH = "faiss_index"
-
-@st.cache_resource(show_spinner="Vektör veritabanı hazırlanıyor...")
 def load_vectordb():
-    if os.path.exists(FAISS_PATH):
-        vectordb = FAISS.load_local(
-            FAISS_PATH,
-            get_embedding_model(),
-            allow_dangerous_deserialization=True
-        )
-        st.success("Vektör veritabanı diskten yüklendi ✅")
-        return vectordb
+    persist_directory = "faiss_index"
+
+    if os.path.exists(persist_directory):
+        vectordb = FAISS.load_local(persist_directory, get_embedding_model(), allow_dangerous_deserialization=True)
     else:
-        st.info("PDF dosyası embed ediliyor ve FAISS veritabanı oluşturuluyor...")
-        loader = PyPDFLoader("yogurt-uygarligi.pdf")
+        loader = PyPDFLoader("yogurt-recipes.pdf")  # kendi PDF dosyanı koy
         documents = loader.load()
-        text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+
+        # Metin parçalayıcı
+        text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         yogurt_docs = text_splitter.split_documents(documents)
 
+        # HuggingFace embedding kullan
         embedding = get_embedding_model()
         vectordb = FAISS.from_documents(yogurt_docs, embedding)
-        vectordb.save_local(FAISS_PATH)
-        st.success("Vektör veritabanı oluşturuldu ve kaydedildi ✅")
-        return vectordb
 
-# ======================
-#  RAG Zinciri
-# ======================
+        # Kaydet
+        vectordb.save_local(persist_directory)
+
+    return vectordb
+
+# ===== LLM (Gemini) =====
 @st.cache_resource
-def create_rag_chain():
-    llm = get_llm_model()
-    vectordb = load_vectordb()
+def get_llm():
+    return ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.3)
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "Sen uzman bir yoğurtlu tarifler şefisin. Kullanıcının sorusunu belgelerden alınan bilgilere göre yanıtla. Yalnızca verilen belgelerdeki bilgileri kullan."),
-        ("human", "{input}"),
-        ("system", "Konuyla ilgili belge parçacıkları: {context}"),
-    ])
+# ===== Streamlit Uygulaması =====
+st.set_page_config(page_title="Yoğurtlu Mutfak Asistanı", layout="wide")
+st.title("🥛 Yoğurtlu Mutfak Asistanı")
 
-    document_chain = create_stuff_documents_chain(llm, prompt)
-    retriever = vectordb.as_retriever(search_kwargs={"k": 4})
-    retrieval_chain = create_retrieval_chain(retriever, document_chain)
+# Vektör DB
+vectordb = load_vectordb()
+retriever = vectordb.as_retriever(search_kwargs={"k": 5})
 
-    return retrieval_chain
+# Bellek
+memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
-# ======================
-#  Streamlit Uygulaması
-# ======================
-st.set_page_config(page_title="Yoğurtlu Mutfak Rehberi", layout="centered")
-st.title("👨‍🍳 Yoğurtlu Mutfak Rehberi")
-st.write("Yoğurt ile hazırlanan tarifler hakkında bana sorular sorabilirsiniz!")
+# Soru-Cevap zinciri
+llm = get_llm()
+qa_chain = RetrievalQA.from_chain_type(
+    llm=llm,
+    retriever=retriever,
+    memory=memory,
+    chain_type="stuff"
+)
 
-rag_chain = create_rag_chain()
-
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# Sohbet geçmişini göster
-for message in st.session_state.messages:
-    if isinstance(message, HumanMessage):
-        with st.chat_message("user"):
-            st.markdown(message.content)
-    elif isinstance(message, AIMessage):
-        with st.chat_message("assistant"):
-            st.markdown(message.content)
-
-# Kullanıcıdan girdi al
-user_query = st.chat_input("Yoğurtla ne yapabilirim?")
+# Kullanıcı input
+user_query = st.text_input("Tarif veya soru sorun (ör: 'Yoğurtlu çorba tarifi'):")
 
 if user_query:
-    st.session_state.messages.append(HumanMessage(content=user_query))
-    with st.chat_message("user"):
-        st.markdown(user_query)
+    response = qa_chain.run(user_query)
 
-    with st.chat_message("assistant"):
-        with st.spinner("Yanıt aranıyor..."):
-            try:
-                response = rag_chain.invoke({"input": user_query})
-                ai_response_content = response["answer"]
-                st.markdown(ai_response_content)
-                st.session_state.messages.append(AIMessage(content=ai_response_content))
-            except Exception as e:
-                st.error(f"Yanıt alınırken hata oluştu: {e}")
+    # Çeviri (isteğe bağlı)
+    translated_response = GoogleTranslator(source="auto", target="tr").translate(response)
+
+    st.markdown("### 🍽️ Asistanın Yanıtı")
+    st.write(translated_response)
