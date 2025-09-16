@@ -1,91 +1,86 @@
 import os
 import streamlit as st
-import nest_asyncio
-from dotenv import load_dotenv
-from deep_translator import GoogleTranslator
-
-# LangChain ve ilgili kütüphaneler
-from langchain_community.document_loaders import PyPDFLoader
+from pathlib import Path
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
 from langchain_community.vectorstores import FAISS
-from langchain.text_splitter import CharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.llms import HuggingFaceHub
-from langchain.chains import ConversationalRetrievalChain
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain, ConversationalRetrievalChain
+from langchain.schema import Document
 
-# Ortam değişkenlerini yükle
-load_dotenv()
-nest_asyncio.apply()
+# ======= PDF Yükleme ve Vektör DB Oluşturma =======
+@st.cache_data
+def load_vectordb(pdf_folder="pdfs", db_path="faiss_index"):
+    pdf_folder_path = Path(pdf_folder)
+    if not pdf_folder_path.exists():
+        st.error(f"{pdf_folder} klasörü bulunamadı.")
+        return None
 
-# =======================
-# Embedding Model
-# =======================
-def get_embedding_model():
-    return HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    # PDF dosyalarını yükle
+    docs = []
+    for pdf_file in pdf_folder_path.glob("*.pdf"):
+        loader = PyPDFLoader(str(pdf_file))
+        docs.extend(loader.load())
 
-# =======================
-# HuggingFace LLM
-# =======================
-def get_llm():
-    return HuggingFaceHub(
-        repo_id="google/flan-t5-base",  # ücretsiz küçük model
-        model_kwargs={"temperature": 0.2, "max_length": 512}
+    if not docs:
+        st.warning("PDF dosyası bulunamadı.")
+        return None
+
+    # FAISS ile vektör DB oluştur
+    vectordb = FAISS.from_documents(docs, embedding=None)  # embedding None, çünkü pipeline kendisi kullanacak
+    vectordb.save_local(db_path)
+    st.success("Vektör veritabanı oluşturuldu ve kaydedildi ✅")
+    return vectordb
+
+@st.cache_data
+def load_vectordb_local(db_path="faiss_index"):
+    if Path(db_path).exists():
+        return FAISS.load_local(db_path, embedding=None)
+    return None
+
+# ======= HuggingFace Local Model =======
+@st.cache_resource
+def get_llm_local():
+    model_name = "google/flan-t5-small"
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    return pipeline(
+        "text2text-generation",
+        model=model,
+        tokenizer=tokenizer,
+        max_length=512,
+        temperature=0.2
     )
 
-# =======================
-# FAISS Vektör DB
-# =======================
-FAISS_PATH = "faiss_index"
+# ======= RAG Chain Oluşturma =======
+@st.cache_resource
+def create_rag_chain(vectordb):
+    llm = get_llm_local()
 
-@st.cache_resource(show_spinner="Vektör veritabanı hazırlanıyor...")
-def load_vectordb():
-    if os.path.exists(FAISS_PATH):
-        vectordb = FAISS.load_local(
-            FAISS_PATH, get_embedding_model(), allow_dangerous_deserialization=True
-        )
-        st.success("Vektör veritabanı diskten yüklendi ✅")
-        return vectordb
-    else:
-        loader = PyPDFLoader("yogurt-uygarligi.pdf")
-        documents = loader.load()
-        text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-        yogurt_docs = text_splitter.split_documents(documents)
+    # Basit retrieval + generation pipeline
+    def rag_answer(query):
+        # Benzer dokümanları bul
+        docs = vectordb.similarity_search(query, k=3)
+        context_text = "\n".join([doc.page_content for doc in docs])
+        input_text = f"Context: {context_text}\n\nQuestion: {query}\nAnswer:"
+        result = llm(input_text)
+        return result[0]["generated_text"]
 
-        embedding = get_embedding_model()
-        vectordb = FAISS.from_documents(yogurt_docs, embedding)
-        vectordb.save_local(FAISS_PATH)
-        st.success("Vektör veritabanı oluşturuldu ve kaydedildi ✅")
-        return vectordb
+    return rag_answer
 
-# =======================
-# RAG Zinciri
-# =======================
-@st.cache_resource(show_spinner="RAG zinciri hazırlanıyor...")
-def create_rag_chain():
-    vectordb = load_vectordb()
-    llm = get_llm()
-    rag_chain = ConversationalRetrievalChain.from_llm(
-        llm=llm,
-        retriever=vectordb.as_retriever()
-    )
-    return rag_chain
+# ======= Streamlit UI =======
+st.title("Yoğurtlu Mutfak Asistanı - Offline RAG")
 
-# =======================
-# Streamlit Arayüz
-# =======================
-st.title("🥛 Yoğurtlu Mutfak Asistanı (HuggingFace sürümü)")
+# PDF yükleme veya vektör DB yükleme
+vectordb = load_vectordb_local() or load_vectordb()
 
-rag_chain = create_rag_chain()
+if vectordb is not None:
+    rag_chain = create_rag_chain(vectordb)
+    user_question = st.text_input("Sorunuz:")
+    if user_question:
+        answer = rag_chain(user_question)
+        st.markdown(f"**Cevap:** {answer}")
+else:
+    st.warning("Vektör veritabanı yüklenemedi.")
 
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-
-user_input = st.text_input("Soru sor:", "")
-
-if user_input:
-    result = rag_chain.invoke({"question": user_input, "chat_history": st.session_state.chat_history})
-
-    st.session_state.chat_history.append((user_input, result["answer"]))
-
-    st.write("### Yanıt:")
-    st.write(result["answer"])
 
