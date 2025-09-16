@@ -28,7 +28,7 @@ with col1:
 target_lang = languages[selected_lang]
 
 # ================== PDF Yükleme ve Vektör DB ==================
-@st.cache_data
+@st.cache_resource  # <-- cache_data yerine cache_resource
 def load_vectordb(pdf_folder="pdfs", db_path="faiss_index"):
     pdf_folder_path = Path(pdf_folder)
     if not pdf_folder_path.exists():
@@ -50,10 +50,9 @@ def load_vectordb(pdf_folder="pdfs", db_path="faiss_index"):
     st.success("Vektör veritabanı oluşturuldu ve kaydedildi ✅")
     return vectordb
 
-@st.cache_data
+@st.cache_resource  # <-- cache_data yerine cache_resource
 def load_vectordb_local(db_path="faiss_index"):
     if Path(db_path).exists():
-        # embedding objesini oluştur
         embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
         return FAISS.load_local(db_path, embeddings)
     return None
