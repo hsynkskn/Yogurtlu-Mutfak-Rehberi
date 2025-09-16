@@ -9,7 +9,7 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain, ConversationalRetrievalChain
 from langchain.schema import Document
-from langchain.embeddings import HuggingFaceEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 # ======= PDF Yükleme ve Vektör DB Oluşturma =======
 @st.cache_data
@@ -30,7 +30,7 @@ def load_vectordb(pdf_folder="pdfs", db_path="faiss_index"):
         return None
 
     # FAISS ile vektör DB oluştur
-    embeddings = HuggingFaceEmbeddings()  # HuggingFace tabanlı embedding
+    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     vectordb = FAISS.from_documents(docs, embeddings)
     vectordb.save_local(db_path)
     st.success("Vektör veritabanı oluşturuldu ve kaydedildi ✅")
