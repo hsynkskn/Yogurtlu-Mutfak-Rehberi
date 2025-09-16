@@ -4,7 +4,6 @@ import streamlit as st
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import PyPDFLoader
-from langchain.schema import Document
 from langchain_community.embeddings import HuggingFaceEmbeddings
 
 # ================== Dil Seçimi ==================
@@ -32,7 +31,6 @@ def load_vectordb(pdf_folder="pdfs", db_path="faiss_index"):
         st.error(f"{pdf_folder} klasörü bulunamadı.")
         return None
 
-    # PDF dosyalarını yükle
     docs = []
     for pdf_file in pdf_folder_path.glob("*.pdf"):
         loader = PyPDFLoader(str(pdf_file))
@@ -42,7 +40,6 @@ def load_vectordb(pdf_folder="pdfs", db_path="faiss_index"):
         st.warning("PDF dosyası bulunamadı.")
         return None
 
-    # FAISS ile vektör DB oluştur
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     vectordb = FAISS.from_documents(docs, embeddings)
     vectordb.save_local(db_path)
@@ -51,8 +48,8 @@ def load_vectordb(pdf_folder="pdfs", db_path="faiss_index"):
 
 @st.cache_data
 def load_vectordb_local(db_path="faiss_index"):
+    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     if Path(db_path).exists():
-        embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
         try:
             return FAISS.load_local(db_path, embeddings)
         except ValueError:
@@ -80,7 +77,6 @@ def create_rag_chain(_vectordb):
     llm = get_llm_local()
 
     def rag_answer(query):
-        # Benzer dokümanları bul
         docs = _vectordb.similarity_search(query, k=3)
         context_text = "\n".join([doc.page_content for doc in docs])
         input_text = f"Context: {context_text}\n\nQuestion: {query}\nAnswer:"
@@ -92,8 +88,10 @@ def create_rag_chain(_vectordb):
 # ================== Streamlit UI ==================
 st.title("Yoğurtlu Mutfak Asistanı - Offline RAG 🌐")
 
-# PDF yükleme veya vektör DB yükleme
-vectordb = load_vectordb_local() or load_vectordb()
+# Lokal FAISS index yükle, yoksa PDF’den oluştur
+vectordb = load_vectordb_local()
+if vectordb is None:
+    vectordb = load_vectordb()
 
 if vectordb is not None:
     rag_chain = create_rag_chain(vectordb)
@@ -104,6 +102,3 @@ if vectordb is not None:
             st.markdown(f"**Cevap:** {answer}")
 else:
     st.warning("Vektör veritabanı yüklenemedi.")
-
-
-
