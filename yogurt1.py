@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 import streamlit as st
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
+from groq import Groq
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -23,20 +23,17 @@ with col1:
     )
 target_lang = languages[selected_lang]
 
-# ================== Vektör DB İşlemleri ==================
-
-EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
+# ================== Vektör DB ==================
+EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 FAISS_INDEX_PATH = "faiss_index"
 PDF_FOLDER = "pdfs"
 
-@st.cache_resource  # Use cache_resource for models/embeddings
+@st.cache_resource
 def get_embeddings():
-    """Loads and caches the embeddings model."""
     return HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
 
-@st.cache_data  # Use cache_data for data-like objects (like the vector DB itself)
+@st.cache_data
 def create_and_save_vectordb(_pdf_folder=PDF_FOLDER, _db_path=FAISS_INDEX_PATH):
-    """Loads PDFs, creates FAISS index, and saves it."""
     pdf_folder_path = Path(_pdf_folder)
     if not pdf_folder_path.exists():
         st.error(f"'{_pdf_folder}' klasörü bulunamadı. Lütfen PDF dosyalarınızı buraya ekleyin.")
@@ -48,93 +45,87 @@ def create_and_save_vectordb(_pdf_folder=PDF_FOLDER, _db_path=FAISS_INDEX_PATH):
             loader = PyPDFLoader(str(pdf_file))
             docs.extend(loader.load())
         except Exception as e:
-            st.warning(f"'{pdf_file.name}' dosyası yüklenirken hata oluştu: {e}")
+            st.warning(f"'{pdf_file.name}' yüklenemedi: {e}")
 
     if not docs:
-        st.warning("Hiçbir PDF dosyası bulunamadı veya okunamadı.")
+        st.warning("Hiçbir PDF bulunamadı.")
         return None
 
     embeddings = get_embeddings()
     try:
         vectordb = FAISS.from_documents(docs, embeddings)
         vectordb.save_local(_db_path)
-        st.success(f"Vektör veritabanı başarıyla oluşturuldu ve '{_db_path}' adresine kaydedildi. ✅")
+        st.success(f"Vektör veritabanı '{_db_path}' adresine kaydedildi ✅")
         return vectordb
     except Exception as e:
-        st.error(f"Vektör veritabanı oluşturulurken hata oluştu: {e}")
+        st.error(f"FAISS oluşturulamadı: {e}")
         return None
 
 def load_local_vectordb(_db_path=FAISS_INDEX_PATH):
-    """Loads the FAISS index from the local path."""
     embeddings = get_embeddings()
     if Path(_db_path).exists():
         try:
             return FAISS.load_local(_db_path, embeddings)
         except ValueError as e:
-            st.warning(f"FAISS index yüklenirken bir hata oluştu: {e}. Yeniden oluşturulması gerekebilir.")
+            st.warning(f"FAISS index yüklenemedi: {e}")
             return None
     return None
 
-# ================== HuggingFace Local Model ==================
+# ================== Groq API ==================
 @st.cache_resource
-def get_llm_local():
-    """Loads and caches the local LLM pipeline."""
-    model_name = "google/flan-t5-small"
+def get_groq_client():
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        st.error("❌ GROQ_API_KEY ortam değişkeni bulunamadı. Lütfen ayarla.")
+        return None
+    return Groq(api_key=api_key)
+
+def query_groq(prompt: str, model="llama3-8b-8192"):
+    client = get_groq_client()
+    if client is None:
+        return "Groq API anahtarı bulunamadı."
+
     try:
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-        return pipeline(
-            "text2text-generation",
+        response = client.chat.completions.create(
             model=model,
-            tokenizer=tokenizer,
-            max_length=512,
-            temperature=0.2
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=512
         )
+        return response.choices[0].message.content
     except Exception as e:
-        st.error(f"LLM modeli yüklenirken hata oluştu: {e}")
-        return None
+        return f"Groq API hatası: {e}"
 
-# ================== RAG Chain Oluşturma ==================
+# ================== RAG Chain ==================
 def create_rag_chain(_vectordb):
-    """Creates the RAG answering function."""
-    llm = get_llm_local()
-    if llm is None:
-        st.error("LLM modeli yüklenemediği için RAG zinciri oluşturulamıyor.")
-        return None
-
     def rag_answer(query):
         if _vectordb is None:
-            return "Veritabanı mevcut değil, cevap verilemiyor."
+            return "Veritabanı mevcut değil."
         try:
             docs = _vectordb.similarity_search(query, k=3)
             if not docs:
                 return "İlgili bilgi bulunamadı."
             context_text = "\n".join([doc.page_content for doc in docs])
-            input_text = f"Context: {context_text}\n\nQuestion: {query}\nAnswer:"
-            result = llm(input_text)
-            return result[0]["generated_text"]
+            input_text = f"Context:\n{context_text}\n\nQuestion: {query}\nAnswer:"
+            return query_groq(input_text)
         except Exception as e:
-            return f"Cevap üretilirken bir hata oluştu: {e}"
-
+            return f"Cevap üretilirken hata: {e}"
     return rag_answer
 
 # ================== Streamlit UI ==================
-st.title("Yoğurtlu Mutfak Asistanı - Offline RAG 🌐")
+st.title("🥛 Yoğurtlu Mutfak Asistanı - Groq RAG")
 
-# Lokal FAISS index yükle, yoksa PDF’den oluştur
 vectordb = load_local_vectordb()
-
 if vectordb is None:
-    st.warning("Yerel vektör veritabanı bulunamadı veya bozuk. PDF dosyalarınızdan oluşturuluyor...")
+    st.warning("Yerel FAISS index bulunamadı. PDF’lerden oluşturuluyor...")
     vectordb = create_and_save_vectordb()
 
 if vectordb is not None:
     rag_chain = create_rag_chain(vectordb)
-    if rag_chain: # Check if rag_chain was created successfully
-        user_question = st.text_input("Aradığınız malzemeyi veya tarifi yazın:")
-        if user_question:
-            with st.spinner("Cevap hazırlanıyor..."):
-                answer = rag_chain(user_question)
-                st.markdown(f"**Cevap:** {answer}")
+    user_question = st.text_input("Aradığınız malzemeyi veya tarifi yazın:")
+    if user_question:
+        with st.spinner("Cevap hazırlanıyor (Groq API)..."):
+            answer = rag_chain(user_question)
+            st.markdown(f"**Cevap:** {answer}")
 else:
-    st.warning("Vektör veritabanı yüklenemedi veya oluşturulamadı. Lütfen PDF klasörünüzü kontrol edin.")
+    st.warning("Vektör veritabanı yüklenemedi. Lütfen PDF klasörünüzü kontrol edin.")
