@@ -16,7 +16,7 @@ from langchain_core.output_parsers import StrOutputParser
 # ================== Dil Seçimi ==================
 languages = {
     "Türkçe TR": "tr",
-    #"English GB": "en",
+    "English GB": "en",
 }
 
 col1, col2 = st.columns([6, 4])
