@@ -1,7 +1,6 @@
 🥛 Yogurtluyooo! Yoğurtlu Mutfak Asistanı
 
-Site Linki: [https://yogurtlu-mutfak-rehberi.streamlit.app/](https://yogurtlu-mutfak-rehberi.streamlit.app/)
-
+Site Linki: https://yogurtlu-mutfak-rehberi.streamlit.app/
 
 Yogurtluyooo!, kullanıcıların elindeki malzemelere uygun, yoğurt bazlı Türk mutfağı tarifleri öneren, RAG (Retrieval-Augmented Generation) mimarisiyle desteklenmiş çok dilli bir yapay zeka asistanıdır.
 
