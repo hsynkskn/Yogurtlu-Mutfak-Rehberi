@@ -10,10 +10,7 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 languages = {
     "Türkçe TR": "tr",
     "English GB": "en",
-    "Français FR": "fr",
-    "Deutsch DE": "de",
-    "Español ES": "es",
-    "Русский RU": "ru"
+
 }
 
 col1, col2 = st.columns([6, 4])
@@ -113,11 +110,11 @@ def create_rag_chain(_vectordb):
     return rag_answer
 
 # ================== Streamlit UI ==================
-st.title("🥛 Yoğurtlu Mutfak Asistanı - Groq RAG (llama-3.1-8b-instant)")
+st.title("🥛 Yoğurtlu Mutfak Asistanı")
 
 vectordb = load_local_vectordb()
 if vectordb is None:
-    st.warning("Yerel FAISS index bulunamadı. PDF’lerden oluşturuluyor...")
+    #st.warning("Yerel FAISS index bulunamadı. PDF’lerden oluşturuluyor...")
     vectordb = create_and_save_vectordb()
 
 if vectordb is not None:
