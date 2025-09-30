@@ -1,12 +1,9 @@
 import os
 from pathlib import Path
 import streamlit as st
-from groq import Groq
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
-
-# LangChain bileşenleri
 from langchain.prompts import PromptTemplate 
 from langchain_groq import ChatGroq
 from langchain_core.runnables import RunnablePassthrough
@@ -97,25 +94,28 @@ def load_local_vectordb(_db_path=FAISS_INDEX_PATH):
     embeddings = get_embeddings()
     if Path(_db_path).exists():
         try:
-            return FAISS.load_local(_db_path, embeddings, allow_dangerous_deserialization=True)
+            return FAISS.load_local(
+                _db_path, 
+                embeddings, 
+                allow_dangerous_deserialization=True  # ← Güvenlik uyarısı için gerekli
+            )
         except ValueError as e:
             st.warning(f"FAISS index yüklenemedi: {e}. Yeniden oluşturmayı deneyin.")
             return None
     return None
 
-# ================== Groq API ve Model ==================
-# ================== Groq API ve Model ==================
+# ================== Groq LLM Ayarları ==================
 def get_groq_llm():
     """LangChain için Groq Chat Modelini döndürür."""
     if not os.getenv("GROQ_API_KEY"):
         st.error("❌ GROQ_API_KEY ortam değişkeni bulunamadı. Lütfen ayarla.")
         return None
     
+    # api_key parametresi geçilmez — LangChain otomatik okur
     llm = ChatGroq(
         model=GROQ_MODEL,
         temperature=0.2,
         max_tokens=512
-        # api_key burada BELİRTİLMİYOR — LangChain otomatik okur
     )
     return llm
 
@@ -134,8 +134,10 @@ def create_rag_chain_lcel(_vectordb, lang="tr"):
     )
 
     rag_chain = (
-        {"context": retriever | (lambda docs: "\n".join([doc.page_content for doc in docs])), 
-         "question": RunnablePassthrough()}
+        {
+            "context": retriever | (lambda docs: "\n".join([doc.page_content for doc in docs])),
+            "question": RunnablePassthrough()
+        }
         | prompt_template
         | llm
         | StrOutputParser()
