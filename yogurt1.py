@@ -86,16 +86,11 @@ def load_local_vectordb(_db_path=FAISS_INDEX_PATH):
 def get_groq_llm():
     """LangChain için Groq Chat Modelini döndürür."""
     try:
-        # Streamlit secrets'tan API anahtarını al
-        if hasattr(st, 'secrets'):
-            # Streamlit Cloud veya local secrets kullanımı
-            if 'GROQ_API_KEY' in st.secrets:
-                api_key = st.secrets["GROQ_API_KEY"]
-            else:
-                # Eğer secrets'ta yoksa ortam değişkenlerine bak
-                api_key = os.getenv("GROQ_API_KEY")
+        # Önce st.secrets'tan almaya çalış
+        if hasattr(st, 'secrets') and 'GROQ_API_KEY' in st.secrets:
+            api_key = st.secrets["GROQ_API_KEY"]
         else:
-            # st.secrets yoksa ortam değişkenlerine bak
+            # Sonra ortam değişkenlerine bak
             api_key = os.getenv("GROQ_API_KEY")
         
         # API anahtarını kontrol et
@@ -103,6 +98,22 @@ def get_groq_llm():
             st.error("""
             ❌ GROQ_API_KEY bulunamadı. 
             
+            **Lütfen aşağıdakilerden birini yapın:**
+            
+            **Streamlit Cloud için:**
+            1. Uygulamanın "Manage App" → "Settings" → "Secrets" bölümüne gidin
+            2. Aşağıdakini ekleyin:
+            ```
+            GROQ_API_KEY = "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            ```
+            
+            **Yerel geliştirme için:**
+            1. .streamlit/secrets.toml dosyası oluşturun
+            2. Aşağıdakini ekleyin:
+            ```
+            GROQ_API_KEY = "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            ```
+            """)
             return None
             
         # Groq modelini oluştur
@@ -114,19 +125,6 @@ def get_groq_llm():
         )
         return llm
         
-    except Exception as e:
-        st.error(f"Groq modeli oluşturulamadı: {e}")
-        return None
-    
-    # GROQ API Anahtarı bulunduğunda llm'i oluştur
-    try:
-        llm = ChatGroq(
-            model=GROQ_MODEL,
-            temperature=0.2,
-            max_tokens=512,
-            groq_api_key=api_key 
-        )
-        return llm
     except Exception as e:
         st.error(f"Groq modeli oluşturulamadı: {e}")
         return None
