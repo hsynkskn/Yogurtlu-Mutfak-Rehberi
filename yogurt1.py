@@ -12,7 +12,6 @@ from langchain_groq import ChatGroq
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 
-
 # ================== Dil Seçimi ==================
 languages = {
     "Türkçe TR": "tr",
@@ -24,13 +23,15 @@ with col1:
     selected_lang = st.radio(
         "🌐 Language:", options=list(languages.keys()), index=0, horizontal=True
     )
-target_lang = languages[selected_lang]
+# Seçilen dilin kısa kodu (örneğin 'tr' veya 'en')
+target_lang = languages[selected_lang] 
+st.session_state["target_lang"] = target_lang # Dil kodunu session state'e kaydediyoruz
 
 # ================== Vektör DB Yapılandırması ==================
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 FAISS_INDEX_PATH = "faiss_index"
 PDF_FOLDER = "pdfs"
-GROQ_MODEL = "llama-3.1-8b-instant" # Kullanacağımız Groq modeli
+GROQ_MODEL = "llama-3.1-8b-instant"
 
 @st.cache_resource
 def get_embeddings():
@@ -48,7 +49,6 @@ def create_and_save_vectordb(_pdf_folder=PDF_FOLDER, _db_path=FAISS_INDEX_PATH):
     docs = []
     for pdf_file in pdf_folder_path.glob("*.pdf"):
         try:
-            # Sadece PyPDFLoader değil, tüm dosya yükleyicilerini desteklemek için (Gerekliyse)
             loader = PyPDFLoader(str(pdf_file))
             docs.extend(loader.load())
         except Exception as e:
@@ -60,7 +60,6 @@ def create_and_save_vectordb(_pdf_folder=PDF_FOLDER, _db_path=FAISS_INDEX_PATH):
 
     embeddings = get_embeddings()
     try:
-        # FAISS veritabanını oluşturma
         vectordb = FAISS.from_documents(docs, embeddings)
         vectordb.save_local(_db_path)
         st.success(f"Vektör veritabanı '{_db_path}' adresine kaydedildi ✅")
@@ -76,7 +75,6 @@ def load_local_vectordb(_db_path=FAISS_INDEX_PATH):
         try:
             return FAISS.load_local(_db_path, embeddings)
         except ValueError as e:
-            # Eğer FAISS index'in formatı değişmişse bu hatayı alabiliriz.
             st.warning(f"FAISS index yüklenemedi: {e}. Yeniden oluşturmayı deneyin.")
             return None
     return None
@@ -89,7 +87,6 @@ def get_groq_llm():
         st.error("❌ GROQ_API_KEY ortam değişkeni bulunamadı. Lütfen ayarla.")
         return None
     
-    # LangChain-Groq entegrasyonu, doğrudan os.getenv() içindeki anahtarı kullanır.
     llm = ChatGroq(
         model=GROQ_MODEL,
         temperature=0.2,
@@ -97,20 +94,24 @@ def get_groq_llm():
     )
     return llm
 
-# ================== Prompt Tanımı ==================
-# İstediğiniz PromptTemplate
+# ================== Prompt Tanımı (DİL DESTEĞİ EKLENDİ) ==================
+# Yeni input_variables: ["context", "question", "language"]
 prompt_template = PromptTemplate(
-    input_variables=["context", "question"],
+    input_variables=["context", "question", "language"],
     template="""
-Sen bir şef asistanısın. Aşağıda yoğurtla ilgili tarif bilgileri içeren bir metin var:
+You are a chef assistant specializing in yogurt-based recipes. The text below contains recipe information about yogurt:
 
 {context}
 
-Kullanıcının verdiği malzemelere uygun, sadece yoğurt içeren tarifler öner.
-Türk mutfağına öncelik ver. Malzeme listesi ve yapılış adımlarını yaz.
-Sade, akıcı ve kullanıcı dostu bir dille yaz. Gerekiyorsa alternatif malzemeler de öner.
+Based on the ingredients provided by the user, suggest recipes that primarily contain yogurt.
+Prioritize Turkish cuisine. Provide a list of ingredients and preparation steps.
+Write in a simple, fluent, and user-friendly tone. Suggest alternative ingredients if necessary.
 
-Malzemeler: {question}
+---
+VERY IMPORTANT: **Translate the entire response into the language specified by the 'language' variable.** Language Code: {language}
+---
+
+Ingredients: {question}
 """
 )
 
@@ -121,19 +122,21 @@ def create_rag_chain_lcel(_vectordb):
     if llm is None:
         return None
 
-    # Retriever (FAISS veritabanından belge alıcı)
     retriever = _vectordb.as_retriever(search_kwargs={"k": 3})
 
     # LCEL Zinciri:
-    # 1. RunnablePassthrough: Kullanıcının sorusunu alır.
-    # 2. 'context' kısmı: Soru ile ilgili belgeleri (docs) alır, string'e çevirir.
-    # 3. 'question' kısmı: Kullanıcının orijinal sorusunu korur.
-    # 4. Prompt: 'context' ve 'question' ile prompt'u hazırlar.
-    # 5. LLM: Hazırlanan prompt'u Groq modeline gönderir.
-    # 6. StrOutputParser: Modelin çıktısını temiz bir string'e çevirir.
+    # 1. 'context' ve 'language' için iki ayrı girdi pas-through ile alınıyor.
+    #    'context': retriever'dan gelen belgeler.
+    #    'question': Kullanıcının orijinal sorusu.
+    #    'language': Streamlit Session State'den alınan dil kodu.
     rag_chain = (
-        {"context": retriever | (lambda docs: "\n".join([doc.page_content for doc in docs])), 
-         "question": RunnablePassthrough()
+        {
+            # Belgeleri al ve string'e çevir
+            "context": retriever | (lambda docs: "\n".join([doc.page_content for doc in docs])), 
+            # Kullanıcının orijinal sorusunu koru
+            "question": RunnablePassthrough(),
+            # Session State'deki dil kodunu doğrudan prompt'a gönder
+            "language": (lambda x: st.session_state["target_lang"])
         }
         | prompt_template
         | llm
@@ -156,15 +159,19 @@ if vectordb is not None:
     # RAG Zincirini oluştur
     rag_chain = create_rag_chain_lcel(vectordb)
     
+    # Kullanıcının diline göre input alanını güncelleyelim
+    input_label = "Aradığınız malzemeyi veya tarifi yazın:" if target_lang == "tr" else "Enter the ingredient or recipe you are looking for:"
+
     if rag_chain is not None:
-        user_question = st.text_input("Aradığınız malzemeyi veya tarifi yazın:")
+        user_question = st.text_input(input_label)
         
         if user_question:
-            with st.spinner("Cevap hazırlanıyor (Groq API)..."):
+            with st.spinner("Cevap hazırlanıyor (Groq API)..." if target_lang == "tr" else "Preparing the answer (Groq API)..."):
                 # Zinciri çalıştırma
-                answer = rag_chain.invoke(user_question)
-                st.markdown(f"**Cevap:** {answer}")
+                # Burada RunnablePassthrough() kullandığımız için sadece user_question'ı invoke etmemiz yeterlidir.
+                answer = rag_chain.invoke(user_question) 
+                st.markdown(f"**Cevap ({selected_lang}):** {answer}" if target_lang == "tr" else f"**Answer ({selected_lang}):** {answer}")
     else:
-        st.error("RAG zinciri başlatılamadı (GROQ_API_KEY eksik olabilir).")
+        st.error("RAG zinciri başlatılamadı (GROQ_API_KEY eksik olabilir)." if target_lang == "tr" else "RAG chain could not be initialized (GROQ_API_KEY might be missing).")
 else:
-    st.warning("Vektör veritabanı yüklenemedi. Lütfen PDF klasörünüzü kontrol edin.")
+    st.warning("Vektör veritabanı yüklenemedi. Lütfen PDF klasörünüzü kontrol edin." if target_lang == "tr" else "Vector database could not be loaded. Please check your PDF folder.")
