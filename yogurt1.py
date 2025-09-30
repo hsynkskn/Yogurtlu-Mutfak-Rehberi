@@ -98,10 +98,14 @@ def get_groq_llm():
     return llm
 
 # ================== Prompt Tanımı ==================
-# İstediğiniz PromptTemplate
+# PromptTemplate'i seçilen dile göre oluştur
 prompt_template = PromptTemplate(
     input_variables=["context", "question"],
-    template="""
+    template=PROMPT_TEMPLATES[target_lang]
+)
+# ================== Dil Bazlı Prompt Şablonları ==================
+PROMPT_TEMPLATES = {
+    "tr": """
 Sen bir şef asistanısın. Aşağıda yoğurtla ilgili tarif bilgileri içeren bir metin var:
 
 {context}
@@ -111,38 +115,36 @@ Türk mutfağına öncelik ver. Malzeme listesi ve yapılış adımlarını yaz.
 Sade, akıcı ve kullanıcı dostu bir dille yaz. Gerekiyorsa alternatif malzemeler de öner.
 
 Malzemeler: {question}
-
-You're a chef's assistant. Below is a text containing yogurt-related recipe information:
+""",
+    "en": """
+You are a chef assistant. Below is a text containing yogurt-based recipe information:
 
 {context}
 
-Suggest yogurt-only recipes based on the ingredients provided by the user.
-Prioritize Turkish cuisine. Provide a list of ingredients and instructions.
-Write in simple, fluid, and user-friendly language. Suggest alternative ingredients if necessary.
+Suggest recipes that include only yogurt and match the user's provided ingredients.
+Prioritize Turkish cuisine. Provide a clear list of ingredients and step-by-step instructions.
+Use simple, fluent, and user-friendly language. Suggest alternative ingredients if needed.
 
 Ingredients: {question}
 """
-
-    
+}
 )
 
 # ================== RAG Zinciri (LCEL) ==================
-def create_rag_chain_lcel(_vectordb):
+def create_rag_chain_lcel(_vectordb, lang="tr"):
     """LCEL kullanarak RAG zincirini oluşturur."""
     llm = get_groq_llm()
     if llm is None:
         return None
 
-    # Retriever (FAISS veritabanından belge alıcı)
     retriever = _vectordb.as_retriever(search_kwargs={"k": 3})
 
-    # LCEL Zinciri:
-    # 1. RunnablePassthrough: Kullanıcının sorusunu alır.
-    # 2. 'context' kısmı: Soru ile ilgili belgeleri (docs) alır, string'e çevirir.
-    # 3. 'question' kısmı: Kullanıcının orijinal sorusunu korur.
-    # 4. Prompt: 'context' ve 'question' ile prompt'u hazırlar.
-    # 5. LLM: Hazırlanan prompt'u Groq modeline gönderir.
-    # 6. StrOutputParser: Modelin çıktısını temiz bir string'e çevirir.
+    # Dil bazlı prompt
+    prompt_template = PromptTemplate(
+        input_variables=["context", "question"],
+        template=PROMPT_TEMPLATES[lang]
+    )
+
     rag_chain = (
         {"context": retriever | (lambda docs: "\n".join([doc.page_content for doc in docs])), 
          "question": RunnablePassthrough()
@@ -165,18 +167,21 @@ if vectordb is None:
 
 # Sorgulama arayüzü
 if vectordb is not None:
-    # RAG Zincirini oluştur
-    rag_chain = create_rag_chain_lcel(vectordb)
+    rag_chain = create_rag_chain_lcel(vectordb, lang=target_lang)  # 👈 burada dil geçiriliyor
     
     if rag_chain is not None:
-        user_question = st.text_input("Aradığınız malzemeyi veya tarifi yazın:")
+        # Dil bazlı input etiketi
+        input_labels = {"tr": "Aradığınız malzemeyi veya tarifi yazın:", "en": "Enter the ingredients or recipe you're looking for:"}
+        user_question = st.text_input(input_labels[target_lang])
         
         if user_question:
-            with st.spinner("Cevap hazırlanıyor (Groq API)..."):
-                # Zinciri çalıştırma
+            with st.spinner("Cevap hazırlanıyor (Groq API)..." if target_lang == "tr" else "Generating answer (Groq API)..."):
                 answer = rag_chain.invoke(user_question)
-                st.markdown(f"**Cevap:** {answer}")
+                label = "**Cevap:**" if target_lang == "tr" else "**Answer:**"
+                st.markdown(f"{label} {answer}")
     else:
-        st.error("RAG zinciri başlatılamadı (GROQ_API_KEY eksik olabilir).")
+        st.error("RAG zinciri başlatılamadı (GROQ_API_KEY eksik olabilir)." if target_lang == "tr" 
+                  else "Failed to initialize RAG chain (GROQ_API_KEY may be missing).")
 else:
-    st.warning("Vektör veritabanı yüklenemedi. Lütfen PDF klasörünüzü kontrol edin.")
+    st.warning("Vektör veritabanı yüklenemedi. Lütfen PDF klasörünüzü kontrol edin." if target_lang == "tr"
+               else "Vector database could not be loaded. Please check your PDF folder.")
