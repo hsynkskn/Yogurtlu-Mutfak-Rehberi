@@ -5,8 +5,13 @@ from groq import Groq
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
+
 # LangChain bileşenlerini ekliyoruz
 from langchain.prompts import PromptTemplate 
+from langchain_groq import ChatGroq
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.output_parsers import StrOutputParser
+
 
 # ================== Dil Seçimi ==================
 languages = {
@@ -21,10 +26,11 @@ with col1:
     )
 target_lang = languages[selected_lang]
 
-# ================== Vektör DB ==================
+# ================== Vektör DB Yapılandırması ==================
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 FAISS_INDEX_PATH = "faiss_index"
 PDF_FOLDER = "pdfs"
+GROQ_MODEL = "llama-3.1-8b-instant" # Kullanacağımız Groq modeli
 
 @st.cache_resource
 def get_embeddings():
@@ -42,6 +48,7 @@ def create_and_save_vectordb(_pdf_folder=PDF_FOLDER, _db_path=FAISS_INDEX_PATH):
     docs = []
     for pdf_file in pdf_folder_path.glob("*.pdf"):
         try:
+            # Sadece PyPDFLoader değil, tüm dosya yükleyicilerini desteklemek için (Gerekliyse)
             loader = PyPDFLoader(str(pdf_file))
             docs.extend(loader.load())
         except Exception as e:
@@ -69,36 +76,26 @@ def load_local_vectordb(_db_path=FAISS_INDEX_PATH):
         try:
             return FAISS.load_local(_db_path, embeddings)
         except ValueError as e:
-            st.warning(f"FAISS index yüklenemedi: {e}")
+            # Eğer FAISS index'in formatı değişmişse bu hatayı alabiliriz.
+            st.warning(f"FAISS index yüklenemedi: {e}. Yeniden oluşturmayı deneyin.")
             return None
     return None
 
-# ================== Groq API ==================
-@st.cache_resource
-def get_groq_client():
-    """Groq API istemcisini oluşturur."""
+# ================== Groq API ve Model ==================
+def get_groq_llm():
+    """LangChain için Groq Chat Modelini döndürür."""
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         st.error("❌ GROQ_API_KEY ortam değişkeni bulunamadı. Lütfen ayarla.")
         return None
-    return Groq(api_key=api_key)
-
-def query_groq(prompt: str, model="llama-3.1-8b-instant"):
-    """Groq API'sine sorgu gönderir."""
-    client = get_groq_client()
-    if client is None:
-        return "Groq API anahtarı bulunamadı."
-
-    try:
-        response = client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-            max_tokens=512
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        return f"Groq API hatası: {e}"
+    
+    # LangChain-Groq entegrasyonu, doğrudan os.getenv() içindeki anahtarı kullanır.
+    llm = ChatGroq(
+        model=GROQ_MODEL,
+        temperature=0.2,
+        max_tokens=512
+    )
+    return llm
 
 # ================== Prompt Tanımı ==================
 # İstediğiniz PromptTemplate
@@ -117,33 +114,33 @@ Malzemeler: {question}
 """
 )
 
-# ================== RAG Chain ==================
-def create_rag_chain(_vectordb):
-    """RAG zincirini (fonksiyonunu) oluşturur."""
-    def rag_answer(query):
-        if _vectordb is None:
-            return "Veritabanı mevcut değil."
-        try:
-            # 1. Alaka düzeyi araması (Retrieval)
-            docs = _vectordb.similarity_search(query, k=3)
-            if not docs:
-                return "İlgili bilgi bulunamadı."
-            
-            # 2. Context (Bağlam) metnini birleştirme
-            context_text = "\n".join([doc.page_content for doc in docs])
-            
-            # 3. Prompt oluşturma (Augmentation)
-            # PromptTemplate'i kullanarak tam prompt metnini oluşturma
-            full_prompt = prompt_template.format(
-                context=context_text,
-                question=query
-            )
-            
-            # 4. Groq API'ye sorgu gönderme (Generation)
-            return query_groq(full_prompt)
-        except Exception as e:
-            return f"Cevap üretilirken hata: {e}"
-    return rag_answer
+# ================== RAG Zinciri (LCEL) ==================
+def create_rag_chain_lcel(_vectordb):
+    """LCEL kullanarak RAG zincirini oluşturur."""
+    llm = get_groq_llm()
+    if llm is None:
+        return None
+
+    # Retriever (FAISS veritabanından belge alıcı)
+    retriever = _vectordb.as_retriever(search_kwargs={"k": 3})
+
+    # LCEL Zinciri:
+    # 1. RunnablePassthrough: Kullanıcının sorusunu alır.
+    # 2. 'context' kısmı: Soru ile ilgili belgeleri (docs) alır, string'e çevirir.
+    # 3. 'question' kısmı: Kullanıcının orijinal sorusunu korur.
+    # 4. Prompt: 'context' ve 'question' ile prompt'u hazırlar.
+    # 5. LLM: Hazırlanan prompt'u Groq modeline gönderir.
+    # 6. StrOutputParser: Modelin çıktısını temiz bir string'e çevirir.
+    rag_chain = (
+        {"context": retriever | (lambda docs: "\n".join([doc.page_content for doc in docs])), 
+         "question": RunnablePassthrough()
+        }
+        | prompt_template
+        | llm
+        | StrOutputParser()
+    )
+    return rag_chain
+
 
 # ================== Streamlit UI ==================
 st.title("🥛 Yoğurtlu Mutfak Asistanı")
@@ -156,12 +153,18 @@ if vectordb is None:
 
 # Sorgulama arayüzü
 if vectordb is not None:
-    rag_chain = create_rag_chain(vectordb)
-    user_question = st.text_input("Aradığınız malzemeyi veya tarifi yazın:")
+    # RAG Zincirini oluştur
+    rag_chain = create_rag_chain_lcel(vectordb)
     
-    if user_question:
-        with st.spinner("Cevap hazırlanıyor (Groq API)..."):
-            answer = rag_chain(user_question)
-            st.markdown(f"**Cevap:** {answer}")
+    if rag_chain is not None:
+        user_question = st.text_input("Aradığınız malzemeyi veya tarifi yazın:")
+        
+        if user_question:
+            with st.spinner("Cevap hazırlanıyor (Groq API)..."):
+                # Zinciri çalıştırma
+                answer = rag_chain.invoke(user_question)
+                st.markdown(f"**Cevap:** {answer}")
+    else:
+        st.error("RAG zinciri başlatılamadı (GROQ_API_KEY eksik olabilir).")
 else:
     st.warning("Vektör veritabanı yüklenemedi. Lütfen PDF klasörünüzü kontrol edin.")
