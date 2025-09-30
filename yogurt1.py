@@ -103,13 +103,6 @@ def get_groq_llm():
             st.error("""
             ❌ GROQ_API_KEY bulunamadı. 
             
-            **Çözüm yolları:**
-            1. **Streamlit Cloud:** Settings → Secrets → Aşağıdakini ekle:
-               ```
-               GROQ_API_KEY = "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-               ```
-            2. **Yerel geliştirme:** .streamlit/secrets.toml dosyasına ekle
-            """)
             return None
             
         # Groq modelini oluştur
