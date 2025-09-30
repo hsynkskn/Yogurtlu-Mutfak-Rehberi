@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 import streamlit as st
-from groq import Groq
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -67,7 +66,7 @@ def create_and_save_vectordb(_pdf_folder=PDF_FOLDER, _db_path=FAISS_INDEX_PATH):
         st.success(f"Vektör veritabanı '{_db_path}' adresine kaydedildi ✅")
         return vectordb
     except Exception as e:
-        st.error(f"FAISS oluşturulamadı: {e}")
+        st.error(f"FAISS oluşturulamadı: {e}. Lütfen FAISS paketini kurun: pip install faiss-cpu")
         return None
 
 def load_local_vectordb(_db_path=FAISS_INDEX_PATH):
@@ -231,4 +230,9 @@ if vectordb is not None:
     else:
         st.error(error_text)
 else:
+    # db_warning değişkenini burada tanımlayalım
+    if target_lang == "tr":
+        db_warning = "Vektör veritabanı yüklenemedi. Lütfen PDF klasörünüzü kontrol edin."
+    else:
+        db_warning = "Vector database could not be loaded. Please check your PDF folder."
     st.warning(db_warning)
