@@ -111,7 +111,7 @@ Türk mutfağına öncelik ver. Malzeme listesi ve yapılış adımlarını yaz.
 Sade, akıcı ve kullanıcı dostu bir dille yaz. Gerekiyorsa alternatif malzemeler de öner.
 
 Malzemeler: {question}
-"""
+# """
 You're a chef's assistant. Below is a text containing yogurt recipe information:
 
 {context}
