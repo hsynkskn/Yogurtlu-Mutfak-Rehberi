@@ -85,15 +85,25 @@ def load_local_vectordb(_db_path=FAISS_INDEX_PATH):
 
 def get_groq_llm():
     """LangChain için Groq Chat Modelini döndürür."""
-    api_key = os.getenv("GROQ_API_KEY")
+    # API anahtarını doğrudan st.secrets'tan almaya çalışıyoruz
+    try:
+        api_key = st.secrets["GROQ_API_KEY"]
+    except AttributeError:
+        # Eğer st.secrets bulunamazsa (yerel ortamda veya secrets ayarlanmadıysa)
+        # os.getenv ile ortam değişkenine fallback yapıyoruz
+        api_key = os.getenv("GROQ_API_KEY")
+
     if not api_key:
-        st.error("❌ GROQ_API_KEY ortam değişkeni bulunamadı. Lütfen ayarla.")
+        st.error("❌ GROQ_API_KEY bulunamadı. Lütfen Streamlit Cloud'daki 'Secrets' bölümünü kontrol edin veya yerel ortamda ayarlayın.")
         return None
     
+    # GROQ API Anahtarı bulunduğunda llm'i oluştur
     llm = ChatGroq(
         model=GROQ_MODEL,
         temperature=0.2,
-        max_tokens=512
+        max_tokens=512,
+        # API anahtarını LangChain modeline açıkça iletiyoruz (Gerekliyse)
+        groq_api_key=api_key 
     )
     return llm
 
@@ -136,6 +146,7 @@ def create_rag_chain_lcel(_vectordb, _target_lang):
     """LCEL kullanarak RAG zincirini oluşturur."""
     llm = get_groq_llm()
     if llm is None:
+        # get_groq_llm zaten hata mesajını gösterdiği için sadece None döndürüyoruz
         return None
 
     # Seçilen dile göre doğru prompt'u kullan
@@ -175,13 +186,13 @@ if vectordb is not None:
     if target_lang == "tr":
         input_label = "Aradığınız malzemeyi veya tarifi yazın:"
         spinner_text = "Cevap hazırlanıyor (Groq API)..."
-        error_text = "RAG zinciri başlatılamadı (GROQ_API_KEY eksik olabilir)."
+        error_text = "RAG zinciri başlatılamadı (API Anahtarı eksik veya geçersiz)."
         answer_prefix = f"**Cevap ({selected_lang_name}):**"
         db_warning = "Vektör veritabanı yüklenemedi. Lütfen PDF klasörünüzü kontrol edin."
     else: # English
         input_label = "Enter the ingredient or recipe you are looking for:"
         spinner_text = "Preparing the answer (Groq API)..."
-        error_text = "RAG chain could not be initialized (GROQ_API_KEY might be missing)."
+        error_text = "RAG chain could not be initialized (API Key missing or invalid)."
         answer_prefix = f"**Answer ({selected_lang_name}):**"
         db_warning = "Vector database could not be loaded. Please check your PDF folder."
 
