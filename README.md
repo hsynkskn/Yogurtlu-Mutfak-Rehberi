@@ -1,248 +1,139 @@
-Yoğurtlu Mutfak Rehberi
+🥛 Yogurtluyooo! Yoğurtlu Mutfak Asistanı
 
 Site Linki: [https://yogurtlu-mutfak-rehberi.streamlit.app/](https://yogurtlu-mutfak-rehberi.streamlit.app/)
 
-Projenin Kapsamı:
-Bu proje, kullanıcıların belirttiği malzemelere uygun yoğurtlu tarifler öneren bir Yogurt Tarif Asistanı uygulaması geliştirmeyi amaçlıyor. Kullanıcı, uygulamaya girdiklerinde sahip oldukları malzemeleri belirtir ve sistem, yalnızca bu malzemeleri kullanarak, özellikle yoğurt içeren Türk mutfağı tariflerini önerir. Proje, Streamlit tabanlı bir arayüzle, LangChain ve Google Generative AI teknolojileriyle desteklenen bir yapay zeka çözümü sunuyor.
 
-Çözülen Problem:
-Kullanıcılar, mutfakta hangi malzemelere sahip olduklarını bilseler de, bu malzemelerle ne tür tarifler hazırlayabileceklerini bazen bilemezler. Özellikle yoğurt gibi temel bir malzeme ile hangi tariflerin yapılabileceğini öğrenmek isteyenler için, bu uygulama doğru, anlamlı ve kullanıcı dostu tarif önerileri sunarak bu boşluğu doldurur. Türk mutfağına özgü tarifler önerilerek, kullanıcıların kültürel bağlamda anlamlı tarifler elde etmeleri sağlanır.
+Yogurtluyooo!, kullanıcıların elindeki malzemelere uygun, yoğurt bazlı Türk mutfağı tarifleri öneren, RAG (Retrieval-Augmented Generation) mimarisiyle desteklenmiş çok dilli bir yapay zeka asistanıdır.
 
-RAG (Retrieval-Augmented Generation) Mimarisi:
-Proje, RAG mimarisi kullanılarak yapılandırılmıştır. Bu mimari, bilgiyi önceden büyük veritabanlarında aramak ve ardından bu bilgiyi kullanarak doğru cevabı geliştirmek (generate) için iki aşamalı bir yaklaşım sunar. RAG mimarisi, aşağıdaki adımlarla çalışır:
+🌟 Proje Özeti ve Çözülen Problem
+Kullanıcılar mutfaklarında sahip oldukları temel malzemelerle (özellikle yoğurtla) ne tür özgün tarifler yapabileceklerini merak eder. Bu uygulama, kullanıcı girdilerini analiz ederek, güvenilir bir PDF kaynağından (Kültür ve Turizm Bakanlığı'nın "Yogurt Uygarlığı Tarifleri" kitabı) alınan verilerle, hızlı, anlamlı ve kullanıcı dostu tarif önerileri sunar.
 
-Veri Alma (Retrieval):
+RAG (Retrieval-Augmented Generation) Mimarisi
+Uygulama, hem bilginin doğruluğunu hem de yanıtın doğal dil kalitesini maksimize etmek için RAG mimarisini kullanır:
 
-Uygulama, bir PDF dosyasındaki yoğurtlu tarif bilgilerini Chroma vektör veritabanına yükler. Bu veritabanı, içerdiği metinlere dayalı olarak arama yapabilmek için önceden dizine eklenmiş verilere sahiptir.
+Veri Alma (Retrieval): Kullanıcı sorgusu (malzeme listesi), PDF'ten oluşturulmuş FAISS Vektör Veritabanı içinde aranır. Bu arama sonucunda en alakalı yoğurtlu tarif metinleri ("bağlam") alınır.
 
-Kullanıcı bir malzeme listesi girdiğinde, bu listeye uygun yoğurtla ilgili tariflerin veritabanında aranması sağlanır.
+Yanıt Üretme (Generation): Elde edilen bu bağlam, Groq'un hızlı dil modeline (llama-3.1-8b-instant) iletilir. Model, kullanıcının dilini, malzemelerini ve Türk mutfağı kısıtlamalarını dikkate alarak son ve özelleştirilmiş tarifi oluşturur.
 
-Yanıt Üretme (Generation):
+🛠️ Kullanılan Teknolojiler
+Kategori	Teknoloji	Amaç
+Arayüz	Streamlit	Hızlı, interaktif ve kullanıcı dostu web arayüzü sağlar.
+Çerçeve	LangChain (langchain-core, langchain-community)	LLM tabanlı uygulamalar oluşturmak için modüler yapı ve zincirleme yeteneği sunar.
+LLM Sağlayıcı	Groq (langchain-groq)	Yüksek hızlı çıkarım (inference) için LLM servisini sağlar.
+Veritabanı	FAISS	PDF metinlerini hızlıca indekslemek ve benzerlik aramaları yapmak için kullanılan yüksek performanslı vektör deposu.
+Veri Yükleyici	PyPDF	PDF dosyalarındaki metin verilerini çıkarmak için kullanılır.
+Embeddings	Sentence Transformers (HuggingFaceEmbeddings)	Metinleri vektör temsillerine dönüştürerek FAISS'e hazırlar.
+Harika bir projeyi hayata geçiriyorsunuz! Geliştirme süreci boyunca karşılaşılan tüm bu zorluklar, projenin olgunlaşmasına katkı sağlıyor.
 
-Arama sonucunda elde edilen bağlam (yani, tarifle ilgili metinler) bir GPT modeline iletilir. Burada, model, kullanıcının sağladığı malzeme listesine göre yalnızca yoğurt içeren tarifleri önerir ve bu tarifleri basit, kullanıcı dostu bir dilde sunar.
+İsteğiniz üzerine, paylaştığınız kapsamlı proje tanımını, RAG mimarisi detaylarını, kullandığınız teknolojileri ve kurulum adımlarını içeren profesyonel bir README.md dosyası hazırladım.
 
-Model, özellikle Türk mutfağına odaklanır ve alternatif malzeme önerileri de yapabilir.
+Bu README, projenizin GitHub deposunun ana sayfasında kullanıma hazırdır ve kodunuzdaki Groq entegrasyonuna (LangChain, Streamlit Secrets) ve FAISS vektör veritabanına odaklanılmıştır.
 
-Kapsamlı Bir Çözüm:
+🥛 Yogurtluyooo! Yoğurtlu Mutfak Asistanı
+Yogurtluyooo!, kullanıcıların elindeki malzemelere uygun, yoğurt bazlı Türk mutfağı tarifleri öneren, RAG (Retrieval-Augmented Generation) mimarisiyle desteklenmiş çok dilli bir yapay zeka asistanıdır.
 
-RAG mimarisi, veritabanından doğru bilgiyi alırken, aynı zamanda kullanıcıyı anlamak ve önerileri doğal bir şekilde oluşturmak için güçlü dil modellerini kullanır. Bu, bilgiye dayalı bir öneri sisteminin hem doğru hem de kullanıcı odaklı olmasını sağlar.
+🌟 Proje Özeti ve Çözülen Problem
+Kullanıcılar mutfaklarında sahip oldukları temel malzemelerle (özellikle yoğurtla) ne tür özgün tarifler yapabileceklerini merak eder. Bu uygulama, kullanıcı girdilerini analiz ederek, güvenilir bir PDF kaynağından (Kültür ve Turizm Bakanlığı'nın "Yogurt Uygarlığı Tarifleri" kitabı) alınan verilerle, hızlı, anlamlı ve kullanıcı dostu tarif önerileri sunar.
 
-Kullanılan Teknolojiler:
-1. Streamlit
-Amaç: Web uygulamaları geliştirmek için kullanılan bir açık kaynak kütüphanedir.
-Kullanım: Veri bilimi ve makine öğrenmesi projelerinde hızlı bir şekilde interaktif web uygulamaları geliştirmeye olanak tanır. Projende, kullanıcıların malzemelerini girmesi ve tarif önerileri alması için kullanılan bir arayüz sağlar.
+RAG (Retrieval-Augmented Generation) Mimarisi
+Uygulama, hem bilginin doğruluğunu hem de yanıtın doğal dil kalitesini maksimize etmek için RAG mimarisini kullanır:
 
-2. LangChain (langchain>=0.1.16)
-Amaç: Dil modellerini (LLM) kullanarak veri işleme ve yapay zeka tabanlı uygulamalar geliştirmeye yönelik bir framework'tür.
-Kullanım: LangChain, verileri işlemek ve doğal dil işleme (NLP) görevlerini yerine getirmek için çoklu dil modeli entegrasyonlarını sağlar. Projende, bir kullanıcının girdiği malzeme listesini analiz eden ve yoğurtla ilgili tarifler öneren bir yapay zeka asistanı oluşturmak için kullanılır.
+Veri Alma (Retrieval): Kullanıcı sorgusu (malzeme listesi), PDF'ten oluşturulmuş FAISS Vektör Veritabanı içinde aranır. Bu arama sonucunda en alakalı yoğurtlu tarif metinleri ("bağlam") alınır.
 
-3. LangChain Google Generative AI (langchain-google-genai)
-Amaç: Google'ın generatif AI teknolojilerini LangChain ile entegre etmek için kullanılan bir kütüphanedir.
-Kullanım: Google’ın dil modelleri ve yapay zeka özelliklerinden yararlanarak metin tabanlı uygulamalar geliştirmek için kullanılır. Bu kütüphane, projendeki generatif AI modelinin çalışmasını sağlamak için kullanılır (örneğin, GoogleGenerativeAIEmbeddings ve ChatGoogleGenerativeAI sınıfları).
+Yanıt Üretme (Generation): Elde edilen bu bağlam, Groq'un hızlı dil modeline (llama-3.1-8b-instant) iletilir. Model, kullanıcının dilini, malzemelerini ve Türk mutfağı kısıtlamalarını dikkate alarak son ve özelleştirilmiş tarifi oluşturur.
 
-4. Google Generative AI (google-generativeai)
-Amaç: Google’ın generatif yapay zeka API’larını kullanmak için kullanılan bir kütüphanedir.
-Kullanım: Projede, kullanıcıya tarif önerileri sunarken, Google’ın yapay zeka dil modelinden yararlanmak için bu API kullanılır. ChatGoogleGenerativeAI sınıfı, bir AI asistanının oluşturulmasında temel rol oynar.
+🛠️ Kullanılan Teknolojiler
+Kategori	Teknoloji	Amaç
+Arayüz	Streamlit	Hızlı, interaktif ve kullanıcı dostu web arayüzü sağlar.
+Çerçeve	LangChain (langchain-core, langchain-community)	LLM tabanlı uygulamalar oluşturmak için modüler yapı ve zincirleme yeteneği sunar.
+LLM Sağlayıcı	Groq (langchain-groq)	Yüksek hızlı çıkarım (inference) için LLM servisini sağlar.
+Veritabanı	FAISS	PDF metinlerini hızlıca indekslemek ve benzerlik aramaları yapmak için kullanılan yüksek performanslı vektör deposu.
+Veri Yükleyici	PyPDF	PDF dosyalarındaki metin verilerini çıkarmak için kullanılır.
+Embeddings	Sentence Transformers (HuggingFaceEmbeddings)	Metinleri vektör temsillerine dönüştürerek FAISS'e hazırlar.
 
-5. ChromaDB (chromadb)
-Amaç: Vektör tabanlı veritabanı ve veritabanı yönetim sistemidir. FAISS ve diğer vektör veritabanı çözümleriyle benzer şekilde çalışır.
-Kullanım: Projende, kullanıcının verdiği malzemeler ile benzer içerikleri bulmak için vektör veri yapıları kullanılır. ChromaDB, vektör tabanlı arama ve benzerlik hesaplamaları için kullanılır. Verilerin hızlıca indekslenmesi ve sorgulanması için bu sistem kullanılabilir.
+E-Tablolar'a aktar
+✨ Temel Özellikler ve Kullanım Senaryoları
+Yoğurtlu Tarif Odaklılık: Yalnızca yoğurt içeren ve Türk mutfağına öncelik veren tarifler önerir.
 
-6. Deep-Translator (deep-translator)
-Amaç: Çoklu dil desteği sunan bir çeviri API’sıdır.
-Kullanım: Projenin çok dilli destek sağlaması için kullanılır. Kullanıcıların girdikleri metinleri farklı dillere çevirmek ve cevabı hedef dile çevirmek için bu kütüphane kullanılır. Örneğin, bir kullanıcı Türkçe yazarsa, yanıtı diğer dillerde sunmak için kullanılır.
+Dinamik Çoklu Dil Desteği: Kullanıcının seçtiği dile (Türkçe veya İngilizce) göre hem arayüzü hem de yapay zeka yanıtını tamamen o dile çevirir.
 
-7. PyPDF (pypdf)
-Amaç: PDF dosyalarını okumak ve işlemek için kullanılan bir kütüphanedir.
-Kullanım: Projede, kullanıcılar tarafından yüklenen PDF dosyalarındaki içeriği okumak için kullanılır. PyPDFLoader sınıfı ile PDF dosyasındaki metin verisi çıkarılır ve bu veriler, yoğurtla ilgili tarifleri içerik olarak seçmek için analiz edilir.
+Hızlı Yanıt Süresi: Groq'un yüksek performanslı LLM'leri sayesinde hızlı tarif önerileri sunar.
 
-8. LangChain Community (langchain-community)
-Amaç: LangChain framework’ünün topluluk sürümüdür ve daha fazla özellik, entegrasyon ve araç sağlar.
-Kullanım: LangChain'in açık kaynak sürümü olarak, topluluk tarafından geliştirilen ek özellikleri ve güncellemeleri kullanmanıza olanak tanır. Bu, projedeki temel LangChain işlevselliklerini güçlendirir ve daha fazla araç ve veri kaynağını entegre etmeye yardımcı olur.
+Alternatif Öneriler: Eksik malzemeler için mantıklı alternatifler sunarak tarifin yapılabilirliğini artırır.
 
-9. Python Dotenv (python-dotenv)
-Amaç: Ortam değişkenlerini yüklemek için kullanılan bir kütüphanedir.
-Kullanım: API anahtarları gibi hassas bilgilerin güvenli bir şekilde yönetilmesi için kullanılır. .env dosyasından ortam değişkenlerini okuyarak, bu bilgilerin kodun içinde sert bir şekilde yazılmasını engeller. Google API anahtarları gibi bilgiler, .env dosyasından yüklenir.
+🚀 Kurulum ve Başlatma
+Bu projeyi yerel bilgisayarınızda veya Streamlit Cloud'da çalıştırmak için aşağıdaki adımları takip edin.
 
-10. FAISS (faiss-cpu)
-Amaç: Facebook AI Research tarafından geliştirilen, yüksek performanslı vektör arama kütüphanesidir.
-Kullanım: Projende, benzer belgeleri ve metinleri hızlıca aramak ve sıralamak için kullanılacak. FAISS, veritabanındaki vektörleri hızlıca indeksleyip sorgulamak için kullanılacak.
+1. Proje Dosyalarını İndirme
+Git ile projeyi klonlayın ve dizine girin:
 
-Veri toplama süreci, aşağıdaki adımlarla gerçekleştirilmiştir:
+Bash
 
-Veri Kaynağı:
-
-Kaynak, Yogurt Uygarlığı Tarifleri başlıklı PDF dosyasını içermektedir. Bu dosyaya, Kültür ve Turizm Bakanlığı'nın e-kitap platformu üzerinden erişilmiştir. Kitap, Türk mutfağındaki yoğurtlu tarifler hakkında kapsamlı bilgiler sunmakta olup, hem geleneksel hem de modern tariflere yer vermektedir.
-
-PDF dosyasına şu bağlantıdan ulaşılabilir: Yogurt Uygarlığı Tarifleri PDF.
-
-Veri Toplama:
-
-PyPDF ve LangChain kullanılarak, bu PDF dosyasındaki metinler işlenmiştir. PyPDFLoader aracılığıyla, PDF dosyasındaki tüm sayfalar yüklenmiş ve içeriği metin formatına dönüştürülmüştür.
-
-Ardından, metinlerde "yoğurt" kelimesi geçmeyen içerikler çıkarılmış ve yalnızca yoğurtla ilgili tarifler içeren bölümler seçilmiştir. Bu filtreleme, yalnızca yoğurtlu tarifleri içeren verilerin kullanılmasını sağlamak amacıyla yapılmıştır.
-
-Veri Hazırlama ve Vektörleştirme:
-
-Elde edilen metinler, ChromaDB gibi bir vektör veritabanına aktarılarak vektörleştirilmiştir. Bu işlem, metinlerin sayısal temsillerinin oluşturulmasını sağlayarak, metinler arası benzerliklerin ve ilişkilerin kolayca analiz edilmesine olanak tanımaktadır.
-
-Google Generative AI Embeddings kullanılarak her bir tarifin içeriği gömme (embedding) vektörlerine dönüştürülmüş ve Chroma veritabanında depolanmıştır. Bu sayede, kullanıcının sorduğu malzemelere uygun tarifler, hızlı bir şekilde ve yüksek doğrulukla bulunabilmektedir.
-
-Veri Kaynağının Geçerliliği:
-
-Kullanılan veri kaynağı, Kültür ve Turizm Bakanlığı tarafından sağlandığı için güvenilir ve resmi bir kaynaktır. Yoğurtlu tariflerin Türk mutfağındaki kültürel ve geleneksel önemi göz önünde bulundurularak, bu veri seti projede önemli bir referans olarak seçilmiştir.
-
-Özellikler / Kullanım Senaryosu
-Yogurtluyooo! V1 uygulaması, kullanıcıların malzeme listeleriyle yoğurtlu tarifler aramaları için güçlü bir AI destekli asistan sunmaktadır. Uygulama, LangChain, Google Generative AI, ChromaDB ve deep-translator gibi araçları kullanarak, kullanıcılara özelleştirilmiş tarif önerileri sağlamaktadır. Bu uygulamanın başlıca özellikleri ve kullanım senaryoları aşağıda açıklanmıştır:
-
-1. Multilingual Destek:
-Uygulama, Türkçe, İngilizce, Fransızca, Almanca, İspanyolca ve Rusça olmak üzere çoklu dil desteği sunar. Kullanıcılar, tercihlerine göre istediği dili seçebilir ve uygulama, tüm içerikleri seçilen dilde sunar.
-
-Google Translator entegrasyonu sayesinde, verilen içerikler seçilen dile çevrilir ve her dilde doğru tarif önerileri sunulur.
-
-2. Yoğurtlu Tarif Önerileri:
-Kullanıcılar, malzemeleri girdiklerinde, sistem yalnızca yoğurtlu tarifler önerir. Bu özellik, sadece yoğurt içeren yemek tarifleriyle sınırlı olup, daha fazla çeşitlilik için malzeme girişi özelleştirilebilir.
-
-Uygulama, kullanıcının verdiği malzemelere uygun tarifleri bulmak için Google Generative AI'yi kullanarak akıllı cevaplar üretir.
-
-3. Tarif Veritabanı (PDF Kaynağı):
-Yogurt Uygarlığı Tarifleri adlı PDF kitap, uygulamanın veri kaynağı olarak kullanılır. Kitapta yer alan yoğurtla yapılan tarifler ChromaDB'ye vektörleştirilmiş ve depolanmıştır. Bu sayede, kullanıcıların malzemeleri ile uyumlu tarifler hızlıca bulunur.
-
-PyPDFLoader kullanılarak PDF dosyasındaki metinler işlenmiş ve sadece yoğurt içeren tarifler seçilerek vektör veritabanına aktarılmıştır.
-
-4. Hızlı ve Doğru Yanıtlar:
-Uygulama, kullanıcının yazdığı malzeme listesini analiz ederek, doğru tarifleri Retrieval-Augmented Generation (RAG) yöntemini kullanarak bulur. Bu yöntem, LangChain'in RetrievalQA zincirini kullanarak soruları metinlerle eşleştirir ve anlamlı cevaplar oluşturur.
-
-Kullanıcı dostu bir arayüz ve görsel öğelerle (yemek tarifinin adımlarını ve malzemelerini) sonuçlar hızlı ve kullanıcı dostu bir şekilde sunulur.
-
-5. Alternatif Malzeme Önerileri:
-Eğer kullanıcının girdiği malzeme tarifin gereksinimleriyle uyumlu değilse, sistem alternatif malzeme önerileri sunar. Bu özellik, özellikle malzemelerin eksik olduğu durumlarda kullanıcılara alternatif seçenekler sunarak tarifin tamamlanmasını sağlar.
-
-Bu özellik, kullanıcıya daha fazla seçenek sunarak tarifin esnekliğini artırır.
-
-Kullanım Senaryoları:
-Senaryo 1: Kullanıcı Malzeme Girişi Yapıyor ve Tarif Alıyor
-Bir kullanıcı, elinde bulunan malzemeleri (örneğin, yoğurt, domates, peynir) yazarak tarif önerisi almak istiyor. Sistem, verilen malzemelere uygun, yalnızca yoğurt içeren tarifleri sunar. Uygulama, hızlı bir şekilde yemek tarifini ve adımları kullanıcıya gösterir.
-
-Kullanıcı Girişi: "Yoğurt, domates, peynir"
-
-Yanıt: "Yoğurtlu Domates Salatası Tarifi" — Tarifin malzemeleri ve yapılış adımları verilir.
-
-Senaryo 2: Kullanıcı Farklı Dillerde Tarif Arıyor
-Bir kullanıcı İngilizce dilinde tarif aramak istiyor. Uygulama, Google Translator entegrasyonu sayesinde, İngilizce olarak yazılan tarifi doğru şekilde çevirir ve önerileri sunar.
-
-Kullanıcı Girişi: "I have yogurt, cucumbers, and garlic."
-
-Yanıt: "Yogurt Cucumber Salad Recipe" — Tarifi ve malzemeleri İngilizce olarak sağlar.
-
-Senaryo 3: Kullanıcı Alternatif Malzeme İstiyor
-Bir kullanıcı, tarifte belirtilen bazı malzemeleri temin edememiştir ve alternatif malzemeler arar. Uygulama, bu durumda malzeme alternatifi sunarak tarifin eksiksiz yapılmasını sağlar.
-
-Kullanıcı Girişi: "I have yogurt, but I don't have honey. Can you suggest an alternative?"
-
-Yanıt: "You can use agave syrup or maple syrup as an alternative to honey."
-
-Senaryo 4: Kullanıcı İki Dilde Tarif İstiyor
-Bir kullanıcı, bir tarifin hem Türkçe hem İngilizce olarak gösterilmesini ister. Uygulama, her iki dilde doğru ve anlamlı sonuçlar sağlar.
-
-Kullanıcı Girişi: "Yogurt, cucumber, and mint."
-
-Yanıt: Türkçe: "Yoğurtlu Salata Tarifi" / İngilizce: "Yogurt Cucumber Salad Recipe" şeklinde, iki dilde de tarif önerisi yapılır.
-
-1. Python ve Gerekli Araçların Yüklenmesi
-Uygulama Python ile yazılmıştır, dolayısıyla Python 3.7 veya daha yeni bir sürümünün bilgisayarınızda yüklü olması gerekmektedir.
-
-Python yüklü değilse, Python'un resmi sitesinden Python'u indirin ve yükleyin.
-
-pip (Python paket yöneticisi) otomatik olarak yüklenecektir, ancak yüklü olup olmadığını kontrol etmek için terminal veya komut satırında şu komutu kullanabilirsiniz:
-
-bash
-Kopyala
-Düzenle
-pip --version
-2. Git ile Proje Dosyalarını İndirme
-Projeyi GitHub'dan veya başka bir kaynaktan edindiyseniz, projeyi yerel ortamınıza indirmeniz gerekir.
-
-Git ile projeyi indirmek için:
-
-bash
-Kopyala
-Düzenle
 git clone <repo_url>
 cd <proje_dizin_adı>
-Eğer Git kullanmıyorsanız, projeyi zip dosyası olarak indirip çıkarabilirsiniz.
+2. Sanal Ortam Kurulumu (Tavsiye Edilir)
+Bash
 
-3. Sanallaştırma Ortamı Kurulumu (Opsiyonel, Ancak Tavsiye Edilir)
-Proje bağımlılıkları ile çakışmayı önlemek için sanal bir ortam kullanmak iyi bir uygulamadır. Python venv modülü ile sanal ortam oluşturabilirsiniz.
-
-Sanal ortamı oluşturmak için:
-
-bash
-Kopyala
-Düzenle
 python -m venv env
-Sanal ortamı aktifleştirmek için:
-
-Windows:
-
-bash
-Kopyala
-Düzenle
-.\env\Scripts\activate
-Mac/Linux:
-
-bash
-Kopyala
-Düzenle
+# Linux/Mac
 source env/bin/activate
-4. Gerekli Python Paketlerini Yükleme
-Projenin requirements.txt dosyasındaki gerekli bağımlılıkları yüklemek için şu komutu kullanabilirsiniz:
+# Windows
+.\env\Scripts\activate
+3. Gerekli Bağımlılıkları Yükleme
+Kullandığınız kütüphaneleri requirements.txt dosyasından yükleyin:
 
-bash
-Kopyala
-Düzenle
+Bash
+
 pip install -r requirements.txt
-5. .env Dosyasını Oluşturma
-Projede bazı özel API anahtarları veya ortam değişkenleri kullanılmaktadır. Bunları .env dosyasına eklemeniz gerekecek. Örnek bir .env dosyasını şu şekilde oluşturabilirsiniz:
+(requirements.txt içeriği: streamlit, groq, langchain, langchain-community, langchain-core, langchain-groq, pypdf, sentence-transformers)
 
-Proje dizininde yeni bir dosya oluşturun ve adını .env koyun.
+4. API Anahtarını Ayarlama (GROQ_API_KEY)
+Bu uygulama Groq API anahtarınızı (örneğin gsk_... ile başlayan) gerektirir. Anahtarınızı kesinlikle koda yazmayın.
 
-.env dosyasına şu satırları ekleyin:
+A. Streamlit Cloud İçin (Canlı Yayın) 🌟
+Uygulamanızı Streamlit Cloud'da deploy edin.
 
-bash
-Kopyala
-Düzenle
-GOOGLE_API_KEY=your_google_api_key_here
-Google API Key almak için, Google Cloud Console üzerinden bir proje oluşturup, Google Cloud API'leri için gerekli erişim izinlerini ayarlayabilirsiniz.
+Uygulama panelinde "Edit Secrets" menüsüne gidin.
 
-6. PDF Dosyasını Proje Dizininize Ekleme
-Proje, PDF dosyasını veri kaynağı olarak kullanır. Yogurt Uygarlığı Tarifi adlı PDF dosyasını proje dizininize eklemeniz gerekmektedir. PDF dosyasını şu linkten indirebilirsiniz:
+Aşağıdaki formatta API anahtarınızı girin:
 
-Yogurt Uygarlığı Tarifi PDF
+Ini, TOML
 
-PDF dosyasını projedeki uygun bir dizine (örneğin, pdf_files/) koyun ve pdf_path değişkenini bu dizine göre güncelleyin.
+# .streamlit/secrets.toml formatı
+GROQ_API_KEY="buraya_yeni_ve_geçerli_groq_api_key_inizi_yapistirin"
+Kaydedin ve "Clear cache and redeploy" seçeneğiyle uygulamayı yeniden başlatın.
 
-7. Uygulamayı Çalıştırma
-Bağımlılıklar ve ayarlar tamamlandığında, Streamlit uygulamanızı başlatmak için şu komutu kullanın:
+B. Yerel Çalıştırma İçin
+Yerel olarak çalıştırırken anahtarınızı terminal üzerinden ortam değişkeni olarak ayarlayın:
 
-bash
-Kopyala
-Düzenle
-streamlit run app.py
-app.py dosyasının adı, ana uygulama dosyasının adı olmalıdır (bu örnekte ana dosya app.py olarak varsayılmıştır).
+Linux/Mac:
 
-8. Uygulamayı Kullanma
-Uygulama başarıyla başlatıldıktan sonra, tarayıcınızda localhost:8501 adresine giderek uygulamayı kullanabilirsiniz. Burada:
+Bash
 
-Dil seçimi yaparak, uygulamanın farklı dillerde çalışmasını sağlayabilirsiniz.
+export GROQ_API_KEY="anahtar_değeri"
+Windows (CMD):
 
-Malzeme listesi girerek, yoğurtlu tariflerinizi alabilirsiniz.
+Bash
 
-9. Sorun Giderme
-Eğer API anahtarınız geçersizse veya başka bir hata alıyorsanız, Google API Key'in doğru olduğundan emin olun.
+set GROQ_API_KEY="anahtar_değeri"
+5. PDF Veri Kaynağını Ekleme
+Uygulamanın çalışması için pdfs adında bir klasör oluşturun ve veri kaynağı PDF dosyanızı bu klasöre yerleştirin.
 
+Proje ana dizininde pdfs klasörünü oluşturun.
 
+"Yogurt Uygarlığı Tarifleri" PDF dosyasını indirerek bu klasöre kopyalayın.
 
-PDF yükleme veya veritabanı ile ilgili sorunlar yaşarsanız, PDF dosyasının yolunun doğru ve erişilebilir olduğundan emin olun.
+6. Uygulamayı Başlatma
+Tüm bağımlılıklar ve ayarlar tamamlandığında, uygulamayı başlatın:
 
-Uygulama yükleme sırasında herhangi bir bağımlılık hatası alırsanız, bağımlılıklarınızın düzgün yüklendiğini doğrulamak için pip freeze komutunu kullanarak yüklü paketleri kontrol edebilirsiniz.
+Bash
+
+streamlit run <ana_uygulama_dosyanızın_adı>.py
+(Eğer ana dosyanızın adı app.py ise: streamlit run app.py)
+
+⚠️ Sorun Giderme
+Hata Mesajı	Olası Neden ve Çözüm
+KeyError: GROQ_API_KEY	Streamlit Cloud Hatası: st.secrets sözlüğünde GROQ_API_KEY anahtarı bulunamadı. Lütfen Streamlit Cloud'daki "Edit Secrets" menüsünde anahtar adının tamamen büyük harfle ve tırnak içinde yazıldığından emin olun, ardından uygulamayı durdurup önbelleği temizleyerek yeniden başlatın.
+❌ GROQ_API_KEY bulunamadı...	API anahtarı yerel ortamda veya Streamlit Cloud'da doğru ayarlanmamış. Yukarıdaki Kurulum adımlarını kontrol edin ve anahtarın geçerli olduğundan emin olun.
+FileNotFoundError: 'pdfs' klasörü bulunamadı.	Proje ana dizininde pdfs adında bir klasör oluşturulmamış veya içine PDF dosyası eklenmemiş.
+ValueError: FAISS index yüklenemedi	faiss_index klasörü bozuk olabilir. Uygulamanın yeniden çalıştırılarak FAISS index'in yeniden oluşturulmasını sağlayın.
