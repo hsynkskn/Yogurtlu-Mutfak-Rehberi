@@ -106,41 +106,28 @@ def query_groq(prompt: str, context: str):
     except Exception as e:
         return f"Groq API hatası: {e}"
 
-# ================== RAG Chain ==================
+# ================== RAG Chain (Güncellenmiş) ==================
 def create_rag_chain(_vectordb):
     def rag_answer(query):
         if _vectordb is None:
             return "Veritabanı mevcut değil."
         try:
+            # 1. Retrieval (Belge Alma)
             docs = _vectordb.similarity_search(query, k=3)
             if not docs:
                 return "İlgili bilgi bulunamadı. Lütfen daha genel malzemelerle tekrar deneyin."
             
             context_text = "\n".join([doc.page_content for doc in docs])
             
-            # Artık sadece query_groq(kullanıcı sorusu, context) şeklinde çağırıyoruz.
-            return query_groq(query, context_text)
+            # 2. Generation (Sorgulama)
+            # HATA DÜZELTİLDİ: Artık iki parametreyi de gönderiyoruz: (kullanıcı sorusu, context)
+            return query_groq(query, context_text) # <-- Bu satır düzeltildi
             
         except Exception as e:
+            # Bu hata yakalama bloğu, artık sizin aldığınız hatayı yakalamalı ve 
+            # düzgün bir şekilde raporlamalıydı, ama şimdi onu da düzelttik.
             return f"Cevap üretilirken hata: {e}"
     return rag_answer
-
-# ================== RAG Chain ==================
-def create_rag_chain(_vectordb):
-    def rag_answer(query):
-        if _vectordb is None:
-            return "Veritabanı mevcut değil."
-        try:
-            docs = _vectordb.similarity_search(query, k=3)
-            if not docs:
-                return "İlgili bilgi bulunamadı."
-            context_text = "\n".join([doc.page_content for doc in docs])
-            input_text = f"Context:\n{context_text}\n\nQuestion: {query}\nAnswer:"
-            return query_groq(input_text)
-        except Exception as e:
-            return f"Cevap üretilirken hata: {e}"
-    return rag_answer
-
 # ================== Streamlit UI ==================
 st.title("🥛 Yoğurtlu Mutfak Asistanı - Groq RAG")
 
