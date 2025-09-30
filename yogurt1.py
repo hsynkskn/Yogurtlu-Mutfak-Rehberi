@@ -85,7 +85,7 @@ def load_local_vectordb(_db_path=FAISS_INDEX_PATH):
 
 def get_groq_llm():
     """LangChain için Groq Chat Modelini döndürür."""
-    GROQ_API_KEY="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"
+    api_key ="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"
     
     if not api_key:
         st.error("❌ GROQ_API_KEY bulunamadı.")
