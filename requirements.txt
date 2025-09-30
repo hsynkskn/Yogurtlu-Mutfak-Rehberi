@@ -1,7 +1,8 @@
 streamlit
 groq
-requests
+langchain
 langchain-community
-faiss-cpu
-sentence-transformers
+langchain-core
+langchain-groq
 pypdf
+sentence-transformers
