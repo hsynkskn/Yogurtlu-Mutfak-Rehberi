@@ -8,12 +8,7 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 
 # ================== Dil Seçimi ==================
 languages = {
-    "Türkçe TR": "tr",
-    "English GB": "en",
-    "Français FR": "fr",
-    "Deutsch DE": "de",
-    "Español ES": "es",
-    "Русский RU": "ru"
+    "Türkçe TR": "tr"
 }
 
 col1, col2 = st.columns([6, 4])
