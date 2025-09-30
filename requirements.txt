@@ -6,6 +6,7 @@ langchain-core
 langchain-groq
 pypdf
 sentence-transformers
+faiss-cpu
 
 
 #streamlit
