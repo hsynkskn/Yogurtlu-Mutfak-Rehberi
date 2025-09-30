@@ -1,13 +1,17 @@
 import os
 from pathlib import Path
 import streamlit as st
+from groq import Groq
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
+
+# LangChain bileşenlerini ekliyoruz
 from langchain.prompts import PromptTemplate 
 from langchain_groq import ChatGroq
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
+
 
 # ================== Dil Seçimi ==================
 languages = {
@@ -22,37 +26,11 @@ with col1:
     )
 target_lang = languages[selected_lang]
 
-# ================== Dil Bazlı Prompt Şablonları ==================
-PROMPT_TEMPLATES = {
-    "tr": """
-Sen bir şef asistanısın. Aşağıda yoğurtla ilgili tarif bilgileri içeren bir metin var:
-
-{context}
-
-Kullanıcının verdiği malzemelere uygun, sadece yoğurt içeren tarifler öner.
-Türk mutfağına öncelik ver. Malzeme listesi ve yapılış adımlarını yaz.
-Sade, akıcı ve kullanıcı dostu bir dille yaz. Gerekiyorsa alternatif malzemeler de öner.
-
-Malzemeler: {question}
-""",
-    "en": """
-You are a chef assistant. Below is a text containing yogurt-based recipe information:
-
-{context}
-
-Suggest recipes that include only yogurt and match the user's provided ingredients.
-Prioritize Turkish cuisine. Provide a clear list of ingredients and step-by-step instructions.
-Use simple, fluent, and user-friendly language. Suggest alternative ingredients if needed.
-
-Ingredients: {question}
-"""
-}
-
 # ================== Vektör DB Yapılandırması ==================
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 FAISS_INDEX_PATH = "faiss_index"
 PDF_FOLDER = "pdfs"
-GROQ_MODEL = "llama-3.1-8b-instant"
+GROQ_MODEL = "llama-3.1-8b-instant" # Kullanacağımız Groq modeli
 
 @st.cache_resource
 def get_embeddings():
@@ -70,6 +48,7 @@ def create_and_save_vectordb(_pdf_folder=PDF_FOLDER, _db_path=FAISS_INDEX_PATH):
     docs = []
     for pdf_file in pdf_folder_path.glob("*.pdf"):
         try:
+            # Sadece PyPDFLoader değil, tüm dosya yükleyicilerini desteklemek için (Gerekliyse)
             loader = PyPDFLoader(str(pdf_file))
             docs.extend(loader.load())
         except Exception as e:
@@ -81,6 +60,7 @@ def create_and_save_vectordb(_pdf_folder=PDF_FOLDER, _db_path=FAISS_INDEX_PATH):
 
     embeddings = get_embeddings()
     try:
+        # FAISS veritabanını oluşturma
         vectordb = FAISS.from_documents(docs, embeddings)
         vectordb.save_local(_db_path)
         st.success(f"Vektör veritabanı '{_db_path}' adresine kaydedildi ✅")
@@ -94,24 +74,22 @@ def load_local_vectordb(_db_path=FAISS_INDEX_PATH):
     embeddings = get_embeddings()
     if Path(_db_path).exists():
         try:
-            return FAISS.load_local(
-                _db_path, 
-                embeddings, 
-                allow_dangerous_deserialization=True  # ← Güvenlik uyarısı için gerekli
-            )
+            return FAISS.load_local(_db_path, embeddings)
         except ValueError as e:
+            # Eğer FAISS index'in formatı değişmişse bu hatayı alabiliriz.
             st.warning(f"FAISS index yüklenemedi: {e}. Yeniden oluşturmayı deneyin.")
             return None
     return None
 
-# ================== Groq LLM Ayarları ==================
+# ================== Groq API ve Model ==================
 def get_groq_llm():
     """LangChain için Groq Chat Modelini döndürür."""
-    if not os.getenv("GROQ_API_KEY"):
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
         st.error("❌ GROQ_API_KEY ortam değişkeni bulunamadı. Lütfen ayarla.")
         return None
     
-    # api_key parametresi geçilmez — LangChain otomatik okur
+    # LangChain-Groq entegrasyonu, doğrudan os.getenv() içindeki anahtarı kullanır.
     llm = ChatGroq(
         model=GROQ_MODEL,
         temperature=0.2,
@@ -119,30 +97,60 @@ def get_groq_llm():
     )
     return llm
 
+# ================== Prompt Tanımı ==================
+# İstediğiniz PromptTemplate
+prompt_template = PromptTemplate(
+    input_variables=["context", "question"],
+    template="""
+Sen bir şef asistanısın. Aşağıda yoğurtla ilgili tarif bilgileri içeren bir metin var:
+
+{context}
+
+Kullanıcının verdiği malzemelere uygun, sadece yoğurt içeren tarifler öner.
+Türk mutfağına öncelik ver. Malzeme listesi ve yapılış adımlarını yaz.
+Sade, akıcı ve kullanıcı dostu bir dille yaz. Gerekiyorsa alternatif malzemeler de öner.
+
+Malzemeler: {question}
+"""
+You're a chef's assistant. Below is a text containing yogurt recipe information:
+
+{context}
+
+Suggest yogurt-only recipes based on the ingredients provided by the user.
+Prioritize Turkish cuisine. Provide a list of ingredients and instructions.
+Write in simple, fluent, and user-friendly language. Suggest alternative ingredients if necessary.
+
+Ingredients: {question}
+"""
+)
+
 # ================== RAG Zinciri (LCEL) ==================
-def create_rag_chain_lcel(_vectordb, lang="tr"):
+def create_rag_chain_lcel(_vectordb):
     """LCEL kullanarak RAG zincirini oluşturur."""
     llm = get_groq_llm()
     if llm is None:
         return None
 
+    # Retriever (FAISS veritabanından belge alıcı)
     retriever = _vectordb.as_retriever(search_kwargs={"k": 3})
 
-    prompt_template = PromptTemplate(
-        input_variables=["context", "question"],
-        template=PROMPT_TEMPLATES[lang]
-    )
-
+    # LCEL Zinciri:
+    # 1. RunnablePassthrough: Kullanıcının sorusunu alır.
+    # 2. 'context' kısmı: Soru ile ilgili belgeleri (docs) alır, string'e çevirir.
+    # 3. 'question' kısmı: Kullanıcının orijinal sorusunu korur.
+    # 4. Prompt: 'context' ve 'question' ile prompt'u hazırlar.
+    # 5. LLM: Hazırlanan prompt'u Groq modeline gönderir.
+    # 6. StrOutputParser: Modelin çıktısını temiz bir string'e çevirir.
     rag_chain = (
-        {
-            "context": retriever | (lambda docs: "\n".join([doc.page_content for doc in docs])),
-            "question": RunnablePassthrough()
+        {"context": retriever | (lambda docs: "\n".join([doc.page_content for doc in docs])), 
+         "question": RunnablePassthrough()
         }
         | prompt_template
         | llm
         | StrOutputParser()
     )
     return rag_chain
+
 
 # ================== Streamlit UI ==================
 st.title("🥛 Yoğurtlu Mutfak Asistanı")
@@ -155,28 +163,18 @@ if vectordb is None:
 
 # Sorgulama arayüzü
 if vectordb is not None:
-    rag_chain = create_rag_chain_lcel(vectordb, lang=target_lang)
+    # RAG Zincirini oluştur
+    rag_chain = create_rag_chain_lcel(vectordb)
     
     if rag_chain is not None:
-        input_labels = {
-            "tr": "Aradığınız malzemeyi veya tarifi yazın:",
-            "en": "Enter the ingredients or recipe you're looking for:"
-        }
-        user_question = st.text_input(input_labels[target_lang])
+        user_question = st.text_input("Aradığınız malzemeyi veya tarifi yazın:")
         
         if user_question:
-            spinner_text = "Cevap hazırlanıyor (Groq API)..." if target_lang == "tr" else "Generating answer (Groq API)..."
-            with st.spinner(spinner_text):
+            with st.spinner("Cevap hazırlanıyor (Groq API)..."):
+                # Zinciri çalıştırma
                 answer = rag_chain.invoke(user_question)
-                label = "**Cevap:**" if target_lang == "tr" else "**Answer:**"
-                st.markdown(f"{label} {answer}")
+                st.markdown(f"**Cevap:** {answer}")
     else:
-        error_msg = ("RAG zinciri başlatılamadı (GROQ_API_KEY eksik olabilir)." 
-                     if target_lang == "tr" 
-                     else "Failed to initialize RAG chain (GROQ_API_KEY may be missing).")
-        st.error(error_msg)
+        st.error("RAG zinciri başlatılamadı (GROQ_API_KEY eksik olabilir).")
 else:
-    warning_msg = ("Vektör veritabanı yüklenemedi. Lütfen PDF klasörünüzü kontrol edin." 
-                   if target_lang == "tr" 
-                   else "Vector database could not be loaded. Please check your PDF folder.")
-    st.warning(warning_msg)
+    st.warning("Vektör veritabanı yüklenemedi. Lütfen PDF klasörünüzü kontrol edin.")
