@@ -111,7 +111,19 @@ Türk mutfağına öncelik ver. Malzeme listesi ve yapılış adımlarını yaz.
 Sade, akıcı ve kullanıcı dostu bir dille yaz. Gerekiyorsa alternatif malzemeler de öner.
 
 Malzemeler: {question}
+
+You're a chef's assistant. Below is a text containing yogurt-related recipe information:
+
+{context}
+
+Suggest yogurt-only recipes based on the ingredients provided by the user.
+Prioritize Turkish cuisine. Provide a list of ingredients and instructions.
+Write in simple, fluid, and user-friendly language. Suggest alternative ingredients if necessary.
+
+Ingredients: {question}
 """
+
+    
 )
 
 # ================== RAG Zinciri (LCEL) ==================
