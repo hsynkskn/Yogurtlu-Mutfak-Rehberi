@@ -104,18 +104,18 @@ def load_local_vectordb(_db_path=FAISS_INDEX_PATH):
     return None
 
 # ================== Groq API ve Model ==================
+# ================== Groq API ve Model ==================
 def get_groq_llm():
     """LangChain için Groq Chat Modelini döndürür."""
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
+    if not os.getenv("GROQ_API_KEY"):
         st.error("❌ GROQ_API_KEY ortam değişkeni bulunamadı. Lütfen ayarla.")
         return None
     
     llm = ChatGroq(
         model=GROQ_MODEL,
         temperature=0.2,
-        max_tokens=512,
-        api_key=api_key  # Açıkça belirtmek daha güvenli
+        max_tokens=512
+        # api_key burada BELİRTİLMİYOR — LangChain otomatik okur
     )
     return llm
 
