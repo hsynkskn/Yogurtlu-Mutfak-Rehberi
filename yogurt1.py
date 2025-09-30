@@ -76,16 +76,16 @@ def get_groq_client():
         return None
     return Groq(api_key=api_key)
 
-def query_groq(prompt: str, model="llama3-8b-8192"):
+def query_groq(prompt: str): # Artık model varsayılan değeri almıyor
     client = get_groq_client()
     if client is None:
         return "Groq API anahtarı bulunamadı."
 
     try:
         response = client.chat.completions.create(
-            model=model,
+            model=GROQ_MODEL, # <-- Hatanın kaynağı düzeltildi: Sabitlerden okuyor
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
+            temperature=0.1,
             max_tokens=512
         )
         return response.choices[0].message.content
