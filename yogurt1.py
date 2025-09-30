@@ -80,7 +80,7 @@ def get_groq_client():
         return None
     return Groq(api_key=api_key)
 
-def query_groq(prompt: str, model="llama3-8b-8192"):
+def query_groq(prompt: str, model="llama-3.1-8b-instant"):
     client = get_groq_client()
     if client is None:
         return "Groq API anahtarı bulunamadı."
@@ -113,7 +113,7 @@ def create_rag_chain(_vectordb):
     return rag_answer
 
 # ================== Streamlit UI ==================
-st.title("🥛 Yoğurtlu Mutfak Asistanı - Groq RAG")
+st.title("🥛 Yoğurtlu Mutfak Asistanı - Groq RAG (llama-3.1-8b-instant)")
 
 vectordb = load_local_vectordb()
 if vectordb is None:
