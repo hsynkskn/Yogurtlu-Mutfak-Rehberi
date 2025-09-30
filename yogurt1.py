@@ -5,12 +5,13 @@ from groq import Groq
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
+# LangChain bileşenlerini ekliyoruz
+from langchain.prompts import PromptTemplate 
 
 # ================== Dil Seçimi ==================
 languages = {
     "Türkçe TR": "tr",
     "English GB": "en",
-
 }
 
 col1, col2 = st.columns([6, 4])
@@ -27,10 +28,12 @@ PDF_FOLDER = "pdfs"
 
 @st.cache_resource
 def get_embeddings():
+    """HuggingFace gömme modelini yükler."""
     return HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL_NAME)
 
 @st.cache_data
 def create_and_save_vectordb(_pdf_folder=PDF_FOLDER, _db_path=FAISS_INDEX_PATH):
+    """PDF'leri yükler, parçalar, gömer ve FAISS veritabanı oluşturup kaydeder."""
     pdf_folder_path = Path(_pdf_folder)
     if not pdf_folder_path.exists():
         st.error(f"'{_pdf_folder}' klasörü bulunamadı. Lütfen PDF dosyalarınızı buraya ekleyin.")
@@ -50,6 +53,7 @@ def create_and_save_vectordb(_pdf_folder=PDF_FOLDER, _db_path=FAISS_INDEX_PATH):
 
     embeddings = get_embeddings()
     try:
+        # FAISS veritabanını oluşturma
         vectordb = FAISS.from_documents(docs, embeddings)
         vectordb.save_local(_db_path)
         st.success(f"Vektör veritabanı '{_db_path}' adresine kaydedildi ✅")
@@ -59,6 +63,7 @@ def create_and_save_vectordb(_pdf_folder=PDF_FOLDER, _db_path=FAISS_INDEX_PATH):
         return None
 
 def load_local_vectordb(_db_path=FAISS_INDEX_PATH):
+    """Yerel olarak kaydedilmiş FAISS veritabanını yükler."""
     embeddings = get_embeddings()
     if Path(_db_path).exists():
         try:
@@ -71,6 +76,7 @@ def load_local_vectordb(_db_path=FAISS_INDEX_PATH):
 # ================== Groq API ==================
 @st.cache_resource
 def get_groq_client():
+    """Groq API istemcisini oluşturur."""
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         st.error("❌ GROQ_API_KEY ortam değişkeni bulunamadı. Lütfen ayarla.")
@@ -78,6 +84,7 @@ def get_groq_client():
     return Groq(api_key=api_key)
 
 def query_groq(prompt: str, model="llama-3.1-8b-instant"):
+    """Groq API'sine sorgu gönderir."""
     client = get_groq_client()
     if client is None:
         return "Groq API anahtarı bulunamadı."
@@ -93,18 +100,47 @@ def query_groq(prompt: str, model="llama-3.1-8b-instant"):
     except Exception as e:
         return f"Groq API hatası: {e}"
 
+# ================== Prompt Tanımı ==================
+# İstediğiniz PromptTemplate
+prompt_template = PromptTemplate(
+    input_variables=["context", "question"],
+    template="""
+Sen bir şef asistanısın. Aşağıda yoğurtla ilgili tarif bilgileri içeren bir metin var:
+
+{context}
+
+Kullanıcının verdiği malzemelere uygun, sadece yoğurt içeren tarifler öner.
+Türk mutfağına öncelik ver. Malzeme listesi ve yapılış adımlarını yaz.
+Sade, akıcı ve kullanıcı dostu bir dille yaz. Gerekiyorsa alternatif malzemeler de öner.
+
+Malzemeler: {question}
+"""
+)
+
 # ================== RAG Chain ==================
 def create_rag_chain(_vectordb):
+    """RAG zincirini (fonksiyonunu) oluşturur."""
     def rag_answer(query):
         if _vectordb is None:
             return "Veritabanı mevcut değil."
         try:
+            # 1. Alaka düzeyi araması (Retrieval)
             docs = _vectordb.similarity_search(query, k=3)
             if not docs:
                 return "İlgili bilgi bulunamadı."
+            
+            # 2. Context (Bağlam) metnini birleştirme
             context_text = "\n".join([doc.page_content for doc in docs])
-            input_text = f"Context:\n{context_text}\n\nQuestion: {query}\nAnswer:"
-            return query_groq(input_text)
+            
+            # 3. Prompt oluşturma (Augmentation)
+            # PromptTemplate'i kullanarak tam prompt metnini oluşturma
+            full_prompt = prompt_template.format(
+                context=context_text,
+                question=query
+            )
+            
+            # 4. Groq API'ye sorgu gönderme (Generation)
+            return query_groq(full_prompt)
         except Exception as e:
             return f"Cevap üretilirken hata: {e}"
     return rag_answer
@@ -112,14 +148,17 @@ def create_rag_chain(_vectordb):
 # ================== Streamlit UI ==================
 st.title("🥛 Yoğurtlu Mutfak Asistanı")
 
+# Vektör veritabanını yükle veya oluştur
 vectordb = load_local_vectordb()
 if vectordb is None:
-    #st.warning("Yerel FAISS index bulunamadı. PDF’lerden oluşturuluyor...")
+    st.info("Yerel FAISS index bulunamadı. PDF’lerden oluşturuluyor...")
     vectordb = create_and_save_vectordb()
 
+# Sorgulama arayüzü
 if vectordb is not None:
     rag_chain = create_rag_chain(vectordb)
     user_question = st.text_input("Aradığınız malzemeyi veya tarifi yazın:")
+    
     if user_question:
         with st.spinner("Cevap hazırlanıyor (Groq API)..."):
             answer = rag_chain(user_question)
