@@ -80,29 +80,50 @@ Kurallar:
 5. Sade, akıcı ve kullanıcı dostu bir dille **Türkçe** olarak yaz.
 """
 # ================== Groq API ==================
-@st.cache_resource
-def get_groq_client():
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
-        st.error("❌ GROQ_API_KEY ortam değişkeni bulunamadı. Lütfen ayarla.")
-        return None
-    return Groq(api_key=api_key)
+# Mevcut get_groq_client() fonksiyonu buraya kalsın...
 
-def query_groq(prompt: str): # Artık model varsayılan değeri almıyor
+def query_groq(prompt: str, context: str): 
     client = get_groq_client()
     if client is None:
-        return "Groq API anahtarı bulunamadı."
+        return "Groq API istemcisi başlatılamadı."
+
+    # Groq Chat API'si için Gelişmiş Mesaj Yapısı
+    # 1. System Prompt: Modelin rolünü ve kurallarını belirler.
+    # 2. User Prompt: Bağlamı (Context) ve Kullanıcı Sorusunu iletir.
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": f"Context:\n{context}\n\nMalzemeler: {prompt}"}
+    ]
 
     try:
         response = client.chat.completions.create(
-            model=GROQ_MODEL, # <-- Hatanın kaynağı düzeltildi: Sabitlerden okuyor
-            messages=[{"role": "user", "content": prompt}],
+            model=GROQ_MODEL, 
+            messages=messages, # <-- Güncellenmiş mesaj yapısı
             temperature=0.1,
             max_tokens=512
         )
         return response.choices[0].message.content
     except Exception as e:
         return f"Groq API hatası: {e}"
+
+# ================== RAG Chain ==================
+def create_rag_chain(_vectordb):
+    def rag_answer(query):
+        if _vectordb is None:
+            return "Veritabanı mevcut değil."
+        try:
+            docs = _vectordb.similarity_search(query, k=3)
+            if not docs:
+                return "İlgili bilgi bulunamadı. Lütfen daha genel malzemelerle tekrar deneyin."
+            
+            context_text = "\n".join([doc.page_content for doc in docs])
+            
+            # Artık sadece query_groq(kullanıcı sorusu, context) şeklinde çağırıyoruz.
+            return query_groq(query, context_text)
+            
+        except Exception as e:
+            return f"Cevap üretilirken hata: {e}"
+    return rag_answer
 
 # ================== RAG Chain ==================
 def create_rag_chain(_vectordb):
