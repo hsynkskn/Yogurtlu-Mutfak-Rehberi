@@ -6,13 +6,19 @@ from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
 
-# LangChain bileşenlerini ekliyoruz
+# LangChain bileşenlerini içe aktarma
 from langchain.prompts import PromptTemplate 
 from langchain_groq import ChatGroq
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 
-# ================== Dil Seçimi ==================
+# ================== Yapılandırma Sabitleri ==================
+EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+FAISS_INDEX_PATH = "faiss_index"
+PDF_FOLDER = "pdfs"
+GROQ_MODEL = "llama-3.1-8b-instant"
+
+# ================== Dil Seçimi ve Global Durum ==================
 languages = {
     "Türkçe TR": "tr",
     "English GB": "en",
@@ -20,18 +26,14 @@ languages = {
 
 col1, col2 = st.columns([6, 4])
 with col1:
-    selected_lang = st.radio(
+    selected_lang_name = st.radio(
         "🌐 Language:", options=list(languages.keys()), index=0, horizontal=True
     )
-# Seçilen dilin kısa kodu (örneğin 'tr' veya 'en')
-target_lang = languages[selected_lang] 
-st.session_state["target_lang"] = target_lang # Dil kodunu session state'e kaydediyoruz
+# Seçilen dilin kısa kodu ('tr' veya 'en')
+target_lang = languages[selected_lang_name] 
+st.session_state["target_lang"] = target_lang
 
-# ================== Vektör DB Yapılandırması ==================
-EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-FAISS_INDEX_PATH = "faiss_index"
-PDF_FOLDER = "pdfs"
-GROQ_MODEL = "llama-3.1-8b-instant"
+# ================== Embeddings ve Vektör DB Fonksiyonları ==================
 
 @st.cache_resource
 def get_embeddings():
@@ -40,7 +42,7 @@ def get_embeddings():
 
 @st.cache_data
 def create_and_save_vectordb(_pdf_folder=PDF_FOLDER, _db_path=FAISS_INDEX_PATH):
-    """PDF'leri yükler, parçalar, gömer ve FAISS veritabanı oluşturup kaydeder."""
+    """PDF'leri yükler ve FAISS veritabanı oluşturup kaydeder."""
     pdf_folder_path = Path(_pdf_folder)
     if not pdf_folder_path.exists():
         st.error(f"'{_pdf_folder}' klasörü bulunamadı. Lütfen PDF dosyalarınızı buraya ekleyin.")
@@ -80,6 +82,7 @@ def load_local_vectordb(_db_path=FAISS_INDEX_PATH):
     return None
 
 # ================== Groq API ve Model ==================
+
 def get_groq_llm():
     """LangChain için Groq Chat Modelini döndürür."""
     api_key = os.getenv("GROQ_API_KEY")
@@ -94,49 +97,58 @@ def get_groq_llm():
     )
     return llm
 
-# ================== Prompt Tanımı (DİL DESTEĞİ EKLENDİ) ==================
-# Yeni input_variables: ["context", "question", "language"]
-prompt_template = PromptTemplate(
-    input_variables=["context", "question", "language"],
+# ================== Prompt Tanımları (Dile Göre Ayrı) ==================
+
+# 1. Türkçe Prompt Template
+TR_PROMPT = PromptTemplate(
+    input_variables=["context", "question"],
     template="""
-You are a chef assistant specializing in yogurt-based recipes. The text below contains recipe information about yogurt:
+Sen bir şef asistanısın. Aşağıda yoğurtla ilgili tarif bilgileri içeren bir metin var:
+
+{context}
+
+Kullanıcının verdiği malzemelere uygun, sadece yoğurt içeren tarifler öner.
+Türk mutfağına öncelik ver. Malzeme listesi ve yapılış adımlarını **Türkçe** olarak yaz.
+Sade, akıcı ve kullanıcı dostu bir dille yaz. Gerekiyorsa alternatif malzemeler de öner.
+
+Malzemeler: {question}
+"""
+)
+
+# 2. İngilizce Prompt Template
+EN_PROMPT = PromptTemplate(
+    input_variables=["context", "question"],
+    template="""
+You are a chef assistant specializing in yogurt-based recipes. The text below contains yogurt recipe information:
 
 {context}
 
 Based on the ingredients provided by the user, suggest recipes that primarily contain yogurt.
-Prioritize Turkish cuisine. Provide a list of ingredients and preparation steps.
+Prioritize Turkish cuisine. Provide a list of ingredients and preparation steps **in English**.
 Write in a simple, fluent, and user-friendly tone. Suggest alternative ingredients if necessary.
-
----
-VERY IMPORTANT: **Translate the entire response into the language specified by the 'language' variable.** Language Code: {language}
----
 
 Ingredients: {question}
 """
 )
 
 # ================== RAG Zinciri (LCEL) ==================
-def create_rag_chain_lcel(_vectordb):
+def create_rag_chain_lcel(_vectordb, _target_lang):
     """LCEL kullanarak RAG zincirini oluşturur."""
     llm = get_groq_llm()
     if llm is None:
         return None
 
+    # Seçilen dile göre doğru prompt'u kullan
+    prompt_template = TR_PROMPT if _target_lang == "tr" else EN_PROMPT
+    
+    # Retriever (FAISS veritabanından belge alıcı)
     retriever = _vectordb.as_retriever(search_kwargs={"k": 3})
 
-    # LCEL Zinciri:
-    # 1. 'context' ve 'language' için iki ayrı girdi pas-through ile alınıyor.
-    #    'context': retriever'dan gelen belgeler.
-    #    'question': Kullanıcının orijinal sorusu.
-    #    'language': Streamlit Session State'den alınan dil kodu.
+    # LCEL Zinciri
     rag_chain = (
         {
-            # Belgeleri al ve string'e çevir
             "context": retriever | (lambda docs: "\n".join([doc.page_content for doc in docs])), 
-            # Kullanıcının orijinal sorusunu koru
             "question": RunnablePassthrough(),
-            # Session State'deki dil kodunu doğrudan prompt'a gönder
-            "language": (lambda x: st.session_state["target_lang"])
         }
         | prompt_template
         | llm
@@ -156,22 +168,32 @@ if vectordb is None:
 
 # Sorgulama arayüzü
 if vectordb is not None:
-    # RAG Zincirini oluştur
-    rag_chain = create_rag_chain_lcel(vectordb)
+    # RAG Zincirini, seçilen dil kodu ile oluştur
+    rag_chain = create_rag_chain_lcel(vectordb, target_lang)
     
-    # Kullanıcının diline göre input alanını güncelleyelim
-    input_label = "Aradığınız malzemeyi veya tarifi yazın:" if target_lang == "tr" else "Enter the ingredient or recipe you are looking for:"
+    # Kullanıcının diline göre UI metinleri
+    if target_lang == "tr":
+        input_label = "Aradığınız malzemeyi veya tarifi yazın:"
+        spinner_text = "Cevap hazırlanıyor (Groq API)..."
+        error_text = "RAG zinciri başlatılamadı (GROQ_API_KEY eksik olabilir)."
+        answer_prefix = f"**Cevap ({selected_lang_name}):**"
+        db_warning = "Vektör veritabanı yüklenemedi. Lütfen PDF klasörünüzü kontrol edin."
+    else: # English
+        input_label = "Enter the ingredient or recipe you are looking for:"
+        spinner_text = "Preparing the answer (Groq API)..."
+        error_text = "RAG chain could not be initialized (GROQ_API_KEY might be missing)."
+        answer_prefix = f"**Answer ({selected_lang_name}):**"
+        db_warning = "Vector database could not be loaded. Please check your PDF folder."
 
     if rag_chain is not None:
         user_question = st.text_input(input_label)
         
         if user_question:
-            with st.spinner("Cevap hazırlanıyor (Groq API)..." if target_lang == "tr" else "Preparing the answer (Groq API)..."):
+            with st.spinner(spinner_text):
                 # Zinciri çalıştırma
-                # Burada RunnablePassthrough() kullandığımız için sadece user_question'ı invoke etmemiz yeterlidir.
                 answer = rag_chain.invoke(user_question) 
-                st.markdown(f"**Cevap ({selected_lang}):** {answer}" if target_lang == "tr" else f"**Answer ({selected_lang}):** {answer}")
+                st.markdown(f"{answer_prefix} {answer}")
     else:
-        st.error("RAG zinciri başlatılamadı (GROQ_API_KEY eksik olabilir)." if target_lang == "tr" else "RAG chain could not be initialized (GROQ_API_KEY might be missing).")
+        st.error(error_text)
 else:
-    st.warning("Vektör veritabanı yüklenemedi. Lütfen PDF klasörünüzü kontrol edin." if target_lang == "tr" else "Vector database could not be loaded. Please check your PDF folder.")
+    st.warning(db_warning)
