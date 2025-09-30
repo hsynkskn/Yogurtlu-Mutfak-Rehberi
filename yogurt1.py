@@ -84,16 +84,28 @@ def load_local_vectordb(_db_path=FAISS_INDEX_PATH):
 # ================== Groq API ve Model ==================
 def get_groq_llm():
     """LangChain için Groq Chat Modelini döndürür."""
-    api_key = os.getenv("GROQ_API_KEY")
+    api_key = None
+    
+    # 1. Streamlit Secrets'ı Dene (Streamlit Cloud için birincil yöntem)
+    # Hata yakalama ile secrets'a güvenli bir şekilde erişiriz.
+    if hasattr(st, 'secrets') and "GROQ_API_KEY" in st.secrets:
+        api_key = st.secrets["GROQ_API_KEY"]
+    
+    # 2. Ortam Değişkenini Dene (Yerel testler için)
+    if api_key is None:
+        api_key = os.getenv("GROQ_API_KEY")
+
     if not api_key:
-        st.error("❌ GROQ_API_KEY ortam değişkeni bulunamadı. Lütfen ayarla.")
+        # Eğer anahtar bulunamazsa, kullanıcıya açıkça bilgi ver.
+        st.error("❌ GROQ_API_KEY bulunamadı. Lütfen **Streamlit Cloud 'Secrets'** bölümünü kontrol edin.")
         return None
     
-    # LangChain-Groq entegrasyonu, doğrudan os.getenv() içindeki anahtarı kullanır.
+    # Anahtar bulunduğunda LLM'i oluştur
     llm = ChatGroq(
         model=GROQ_MODEL,
         temperature=0.2,
-        max_tokens=512
+        max_tokens=512,
+        groq_api_key=api_key # LangChain'e anahtarı iletiyoruz.
     )
     return llm
 
