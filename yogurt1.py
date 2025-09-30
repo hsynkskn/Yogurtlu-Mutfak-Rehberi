@@ -80,6 +80,24 @@ Kurallar:
 5. Sade, akıcı ve kullanıcı dostu bir dille **Türkçe** olarak yaz.
 """
 # ================== Groq API ==================
+@st.cache_resource
+def get_groq_client():
+    # Streamlit secrets ve os.getenv'den anahtarı güvenli okuma
+    api_key = None
+    
+    # 1. Streamlit Secrets'ı Dene (Streamlit Cloud için birincil yöntem)
+    if hasattr(st, 'secrets') and "GROQ_API_KEY" in st.secrets:
+        api_key = st.secrets["GROQ_API_KEY"]
+    
+    # 2. Ortam Değişkenini Dene (Yerel testler için)
+    if api_key is None:
+        api_key = os.getenv("GROQ_API_KEY")
+
+    if not api_key:
+        st.error("❌ GROQ_API_KEY bulunamadı. Lütfen **Streamlit Cloud 'Secrets'** bölümünü kontrol edin.")
+        return None
+    
+    return Groq(api_key=api_key)
 # Mevcut get_groq_client() fonksiyonu buraya kalsın...
 
 def query_groq(prompt: str, context: str): 
