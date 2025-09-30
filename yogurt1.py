@@ -85,27 +85,35 @@ def load_local_vectordb(_db_path=FAISS_INDEX_PATH):
 
 def get_groq_llm():
     """LangChain için Groq Chat Modelini döndürür."""
-    # API anahtarını doğrudan st.secrets'tan almaya çalışıyoruz
     try:
-        api_key = st.secrets["GROQ_API_KEY"]
-    except AttributeError:
-        # Eğer st.secrets bulunamazsa (yerel ortamda veya secrets ayarlanmadıysa)
-        # os.getenv ile ortam değişkenine fallback yapıyoruz
-        api_key = os.getenv("GROQ_API_KEY")
-
-    if not api_key:
-        st.error("❌ GROQ_API_KEY bulunamadı. Lütfen Streamlit Cloud'daki 'Secrets' bölümünü kontrol edin veya yerel ortamda ayarlayın.")
+        # Önce st.secrets'tan almaya çalış
+        if hasattr(st, 'secrets') and 'GROQ_API_KEY' in st.secrets:
+            api_key = st.secrets["GROQ_API_KEY"]
+        else:
+            # Sonra ortam değişkenlerine bak
+            api_key = os.getenv("GROQ_API_KEY")
+        
+        # Hala bulunamazsa kullanıcıdan iste
+        if not api_key:
+            st.error("❌ GROQ_API_KEY bulunamadı. Lütfen Streamlit Cloud'daki 'Secrets' bölümünü kontrol edin.")
+            return None
+            
+    except Exception as e:
+        st.error(f"API anahtarı alınırken hata: {e}")
         return None
     
     # GROQ API Anahtarı bulunduğunda llm'i oluştur
-    llm = ChatGroq(
-        model=GROQ_MODEL,
-        temperature=0.2,
-        max_tokens=512,
-        # API anahtarını LangChain modeline açıkça iletiyoruz (Gerekliyse)
-        groq_api_key=api_key 
-    )
-    return llm
+    try:
+        llm = ChatGroq(
+            model=GROQ_MODEL,
+            temperature=0.2,
+            max_tokens=512,
+            groq_api_key=api_key 
+        )
+        return llm
+    except Exception as e:
+        st.error(f"Groq modeli oluşturulamadı: {e}")
+        return None
 
 # ================== Prompt Tanımları (Dile Göre Ayrı) ==================
 
@@ -146,7 +154,6 @@ def create_rag_chain_lcel(_vectordb, _target_lang):
     """LCEL kullanarak RAG zincirini oluşturur."""
     llm = get_groq_llm()
     if llm is None:
-        # get_groq_llm zaten hata mesajını gösterdiği için sadece None döndürüyoruz
         return None
 
     # Seçilen dile göre doğru prompt'u kullan
@@ -174,7 +181,7 @@ st.title("🥛 Yoğurtlu Mutfak Asistanı")
 # Vektör veritabanını yükle veya oluştur
 vectordb = load_local_vectordb()
 if vectordb is None:
-    st.info("Yerel FAISS index bulunamadı. PDF’lerden oluşturuluyor...")
+    st.info("Yerel FAISS index bulunamadı. PDF'lerden oluşturuluyor...")
     vectordb = create_and_save_vectordb()
 
 # Sorgulama arayüzü
@@ -201,9 +208,12 @@ if vectordb is not None:
         
         if user_question:
             with st.spinner(spinner_text):
-                # Zinciri çalıştırma
-                answer = rag_chain.invoke(user_question) 
-                st.markdown(f"{answer_prefix} {answer}")
+                try:
+                    # Zinciri çalıştırma
+                    answer = rag_chain.invoke(user_question) 
+                    st.markdown(f"{answer_prefix} {answer}")
+                except Exception as e:
+                    st.error(f"Sorgu sırasında hata oluştu: {e}")
     else:
         st.error(error_text)
 else:
