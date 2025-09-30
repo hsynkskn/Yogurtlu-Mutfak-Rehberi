@@ -15,7 +15,8 @@ from langchain_core.output_parsers import StrOutputParser
 
 # ================== Dil Seçimi ==================
 languages = {
-    "Türkçe TR": "tr",    
+    "Türkçe TR": "tr",
+    "English GB": "en",
 }
 
 col1, col2 = st.columns([6, 4])
@@ -91,7 +92,7 @@ def get_groq_llm():
     # LangChain-Groq entegrasyonu, doğrudan os.getenv() içindeki anahtarı kullanır.
     llm = ChatGroq(
         model=GROQ_MODEL,
-        temperature=0.1,
+        temperature=0.2,
         max_tokens=512
     )
     return llm
