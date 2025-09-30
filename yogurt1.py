@@ -15,8 +15,7 @@ from langchain_core.output_parsers import StrOutputParser
 
 # ================== Dil Seçimi ==================
 languages = {
-    "Türkçe TR": "tr",
-    "English GB": "en",
+    "Türkçe TR": "tr",    
 }
 
 col1, col2 = st.columns([6, 4])
@@ -92,7 +91,7 @@ def get_groq_llm():
     # LangChain-Groq entegrasyonu, doğrudan os.getenv() içindeki anahtarı kullanır.
     llm = ChatGroq(
         model=GROQ_MODEL,
-        temperature=0.2,
+        temperature=0.1,
         max_tokens=512
     )
     return llm
@@ -111,16 +110,6 @@ Türk mutfağına öncelik ver. Malzeme listesi ve yapılış adımlarını yaz.
 Sade, akıcı ve kullanıcı dostu bir dille yaz. Gerekiyorsa alternatif malzemeler de öner.
 
 Malzemeler: {question}
-# """
-You're a chef's assistant. Below is a text containing yogurt recipe information:
-
-{context}
-
-Suggest yogurt-only recipes based on the ingredients provided by the user.
-Prioritize Turkish cuisine. Provide a list of ingredients and instructions.
-Write in simple, fluent, and user-friendly language. Suggest alternative ingredients if necessary.
-
-Ingredients: {question}
 """
 )
 
